@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-import texmate_grammar as tm
 from textmate_grammar.elements import ContentBlockElement, ContentElement
+from textmate_grammar.grammars import matlab
+from textmate_grammar.language import LanguageParser
+from textmate_grammar.utils import cache
 
 from .attributes import ArgumentAttributes, ClassdefAttributes, MethodAttributes, PropertyAttributes
 from .nodes import (
@@ -23,8 +25,8 @@ from .nodes import (
 )
 from .utils import append_block_comment, append_comment, append_section_comment, fix_indentation
 
-tm.utils.cache.init_cache("shelve")
-TM_PARSER = tm.language.LanguageParser(tm.grammars.matlab)
+cache.init_cache("shelve")
+TM_PARSER = LanguageParser(matlab.GRAMMAR)
 _COMMENT_TOKENS = [
     "comment.line.percentage.matlab",
     "comment.block.percentage.matlab",
@@ -55,7 +57,7 @@ def get_node(path: Path, parent: Node | None = None) -> Node | None:
                 raise Warning(f"Could not parse {path}")
 
             try:
-                next(element.find("meta.class.matlab", depth=1))[0]
+                item = next(element.find("meta.class.matlab", depth=1))[0]
                 parser: Callable[[Path, ContentBlockElement, Node | None], Node] = _parse_m_classdef
             except StopIteration:
                 generator = element.find(
@@ -73,9 +75,10 @@ def get_node(path: Path, parent: Node | None = None) -> Node | None:
                         parser = _parse_m_function
                         break
                 else:
+                    item = element
                     parser = _parse_m_script
 
-            return parser(path, element, parent)
+            return parser(path, item, parent)  # type: ignore
 
         elif path.suffix == ".p":
             # TODO get docstring from .m helper path
@@ -117,8 +120,8 @@ def _resolve_name(name: str, parent: Node | None) -> str:
         str: The fully qualified name.
     """
     while parent:
-        name = f"{parent["name"]}.{name}"
-        parent = parent["parent"]
+        name = f"{parent.name}.{name}"
+        parent = parent.parent
     return name
 
 
@@ -149,7 +152,7 @@ def _validate_token(element: ContentElement, token: str) -> None:
         ValueError: If the element's token does not match the provided token.
     """
     if element.token != token:
-        raise ValueError
+        raise ValueError(f"Expected token {token}, got {element.token}")
 
 
 def _common_function_method(
@@ -181,15 +184,15 @@ def _common_function_method(
         name = element.begin[0].content
 
         if attributes.Output:
-            argument = node["output"][name]
+            argument = node.output[name]
         else:
             if "." in name:
-                node["input"].pop(name.split(".")[0], None)
-                argument = node["options"][name.split(".")[1]]
+                node.input.pop(name.split(".")[0], None)
+                argument = node.options[name.split(".")[1]]
             else:
-                argument = node["input"][name]
+                argument = node.input[name]
 
-        argument["attributes"] = attributes
+        argument.attributes = attributes
         _common_property_argument(argument, arg_element, arg_docstring)
 
     docstring: dict[int, str] = {}
@@ -205,9 +208,13 @@ def _common_function_method(
                 ["variable.parameter.output.matlab", "variable.parameter.input.matlab"]
             ):
                 if variable.token == "variable.parameter.input.matlab":
-                    node["input"][variable.content] = Argument(name=variable.content, parent=node)
+                    node.input[variable.content] = Argument(
+                        name=variable.content, path=node.path, parent=node
+                    )
                 else:
-                    node["output"][variable.content] = Argument(name=variable.content, parent=node)
+                    node.output[variable.content] = Argument(
+                        name=variable.content, path=node.path, parent=node
+                    )
 
         elif function_item.token == "comment.block.percentage.matlab":
             append_block_comment(function_item, docstring)
@@ -249,7 +256,7 @@ def _common_function_method(
                 if arg_elem:
                     _add_argument(arg_elem, attributes, arg_docstring)
 
-    node["docstring"] = fix_indentation(docstring)
+    node.docstring = fix_indentation(docstring)
 
 
 def _common_property_argument(
@@ -278,14 +285,14 @@ def _common_property_argument(
             default_elements
             and default_elements[0][0].token == "keyword.operator.assignment.matlab"
         ):
-            node["default"] = "".join([el.content for el, _ in default_elements[1:]])
+            node.default = "".join([el.content for el, _ in default_elements[1:]])
 
         doc_elements = element.findall("comment.line.percentage.matlab", attribute="end")
 
         for el, _ in doc_elements:
             _line_comment_to_docstring(el, docstring)
 
-    node["docstring"] = fix_indentation(docstring)
+    node.docstring = fix_indentation(docstring)
 
     for expression, _ in element.find(
         [
@@ -296,11 +303,11 @@ def _common_property_argument(
         depth=1,
     ):
         if expression.token == "storage.type.matlab":
-            node["type"] = expression.content
+            node.type = expression.content
         elif expression.token == "meta.parens.size.matlab":
-            node["size"] = expression.content.split(",")
+            node.size = expression.content.split(",")
         else:
-            node["validators"] = [validator.content for validator in expression.children]
+            node.validators = [validator.content for validator in expression.children]
 
 
 def _parse_m_script(path: Path, element: ContentBlockElement, parent: Node | None = None) -> Script:
@@ -372,10 +379,10 @@ def _parse_method(
     _validate_token(element, "meta.function.matlab")
     declaration = next(element.find("meta.function.declaration.matlab", depth=1))[0]
     name = next(declaration.find("entity.name.function.matlab"))[0].content
-    node = Method(name=name, attributes=attributes, parent=parent)
+    node = Method(name=name, attributes=attributes, parent=parent, path=parent.path)
     _common_function_method(node, element, parent)
-    if name != parent["classname"] or not attributes.Static:
-        node["input"].popitem(last=False)
+    if name != parent.classname or not attributes.Static:
+        node.input.popitem(last=False)
     return node
 
 
@@ -403,10 +410,10 @@ def _parse_m_classdef(
     ):
         _validate_token(element, "meta.assignment.definition.property.matlab")
         name = element.begin[0].content
-        prop = Property(name=name, parent=node)
-        prop["attributes"] = attributes
+        prop = Property(name=name, parent=node, path=node.path)
+        prop.attributes = attributes
         _common_property_argument(prop, element, docstring)
-        node["properties"][name] = prop
+        node.properties[name] = prop
 
     _validate_token(element, "meta.class.matlab")
 
@@ -450,7 +457,7 @@ def _parse_m_classdef(
                 if current_modifier:
                     modifiers[current_modifier] = current_value
 
-            node["attributes"] = ClassdefAttributes.from_dict(modifiers)
+            node.attributes = ClassdefAttributes.from_dict(modifiers)
 
             declation_tokens = [
                 "entity.name.type.class.matlab",
@@ -462,9 +469,9 @@ def _parse_m_classdef(
                 declation_tokens, start_tokens=declation_tokens, depth=1
             ):
                 if declation_item.token == "entity.name.type.class.matlab":
-                    node["classname"] = declation_item.content
+                    node.classname = declation_item.content
                 elif declation_item.token == "meta.inherited-class.matlab":
-                    node["ancestors"].append(declation_item.content)
+                    node.ancestors.append(declation_item.content)
                 elif declation_item.token == "punctuation.definition.comment.matlab":
                     _line_comment_to_docstring(class_item, docstring)
 
@@ -533,8 +540,14 @@ def _parse_m_classdef(
                 if enum_item.token == "meta.assignment.definition.enummember.matlab":
                     if enum_name:
                         enum_doc = fix_indentation(enum_docstring)
-                        enum = Enum(name=enum_name, value=enum_value, docstring=enum_doc)
-                        node["enumeration"].append(enum)
+                        enum = Enum(
+                            name=enum_name,
+                            value=enum_value,
+                            docstring=enum_doc,
+                            parent=node,
+                            path=node.path,
+                        )
+                        node.enumeration.append(enum)
                         enum_docstring, enum_value = {}, ""
 
                     enum_name = next(enum_item.find("variable.other.enummember.matlab"))[0].content
@@ -546,8 +559,14 @@ def _parse_m_classdef(
             else:
                 if enum_name:
                     enum_doc = fix_indentation(enum_docstring)
-                    enum = Enum(name=enum_name, value=enum_value, docstring=enum_doc)
-                    node["enumeration"].append(enum)
+                    enum = Enum(
+                        name=enum_name,
+                        value=enum_value,
+                        docstring=enum_doc,
+                        parent=node,
+                        path=node.path,
+                    )
+                    node.enumeration.append(enum)
 
         else:  # meta.methods.matlab
             modifiers = {}
@@ -570,7 +589,7 @@ def _parse_m_classdef(
 
             for method_elem, _ in class_item.find("meta.function.matlab", depth=1):
                 method = _parse_method(node, method_elem, attributes)  # type: ignore
-                node["methods"][method["name"]] = method
+                node.methods[method.name] = method
 
-    node["docstring"] = fix_indentation(docstring)
+    node.docstring = fix_indentation(docstring)
     return node

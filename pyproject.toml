@@ -5,6 +5,10 @@ description = "Navigate the MATLAB search path in Python."
 authors = ["Mark Hu <watermarkhu@gmail.com>"]
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/watermarkhu/matlab-path"
+documentation = "https://"
+keywords = ["MATLAB", "path", "textmate"]
+packages = [{include = "matlab_path", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -47,6 +51,7 @@ docstring-code-line-length = "dynamic"
 
 [tool.mypy]
 ignore_missing_imports = true
+exclude = ["test/*", "docs/*", "example.py"]
 
 [build-system]
 requires = ["poetry-core"]

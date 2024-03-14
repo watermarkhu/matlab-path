@@ -1,71 +1,83 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TypedDict
 
 from .attributes import ArgumentAttributes, ClassdefAttributes, MethodAttributes, PropertyAttributes
 
 
-class Node(TypedDict, total=False):
+@dataclass
+class Node:
     name: str
     path: Path
-    parent: Node | None
+    parent: Node | None = None
 
 
-class Script(Node, total=False):
-    docstring: dict[int, str]
+@dataclass
+class Script(Node):
+    docstring: dict[int, str] = field(default_factory=dict)
 
 
-class Property(Script, total=False):
-    type: str
-    default: str
-    size: list[str]
-    validators: list[str]
-    attributes: PropertyAttributes
+@dataclass
+class Property(Script):
+    type: str = ""
+    default: str = ""
+    size: list[str] = field(default_factory=list)
+    validators: list[str] = field(default_factory=list)
+    attributes: PropertyAttributes = field(default_factory=PropertyAttributes)
 
 
-class Argument(Script, total=False):
-    type: str
-    default: str
-    size: list[str]
-    validators: list[str]
-    attributes: ArgumentAttributes
+@dataclass
+class Argument(Script):
+    type: str = ""
+    default: str = ""
+    size: list[str] = field(default_factory=list)
+    validators: list[str] = field(default_factory=list)
+    attributes: ArgumentAttributes = field(default_factory=ArgumentAttributes)
 
 
-class Enum(Script, total=False):
-    value: str
+@dataclass
+class Enum(Script):
+    value: str = ""
 
 
-class Function(Script, total=False):
-    input: OrderedDict[str, Argument]
-    output: dict[str, Argument]
-    options: OrderedDict[str, Argument]
+@dataclass
+class Function(Script):
+    input: OrderedDict[str, Argument] = field(default_factory=OrderedDict)
+    output: OrderedDict[str, Argument] = field(default_factory=OrderedDict)
+    options: dict[str, Argument] = field(default_factory=dict)
 
 
-class Method(Function, total=False):
-    attributes: MethodAttributes
+@dataclass
+class Method(Function):
+    attributes: MethodAttributes = field(default_factory=MethodAttributes)
 
 
-class Classdef(Script, total=False):
-    isclassfolder: bool
-    classname: str
-    ancestors: list[str]
-    enumeration: list[Enum]
-    methods: dict[str, Method]
-    properties: dict[str, Property]
-    attributes: ClassdefAttributes
+@dataclass
+class Classdef(Script):
+    isclassfolder: bool = False
+    classname: str = ""
+    ancestors: list[str] = field(default_factory=list)
+    enumeration: list[Enum] = field(default_factory=list)
+    methods: dict[str, Method] = field(default_factory=dict)
+    properties: dict[str, Property] = field(default_factory=dict)
+    attributes: ClassdefAttributes = field(default_factory=ClassdefAttributes)
 
 
-class Package(Script, total=False):
-    classes: dict[str, Classdef]
-    functions: dict[str, Function]
+@dataclass
+class Package(Script):
+    classes: dict[str, Classdef] = field(default_factory=dict)
+    functions: dict[str, Function] = field(default_factory=dict)
 
 
-class LiveScript(Script, total=False): ...
+@dataclass
+class LiveScript(Script): ...
 
 
-class App(Script, total=False): ...
+@dataclass
+class App(Script): ...
 
 
-class Mex(Node, total=False): ...
+@dataclass
+class Mex(Node): ...

@@ -82,12 +82,12 @@ class SearchPath:
             node = get_node(member)
             if node is None:
                 continue
-            self._path_members[path].append((node["name"], member))
+            self._path_members[path].append((node.name, member))
             self._database[member] = node
             if to_end:
-                self._namespace[node["name"]].append(member)
+                self._namespace[node.name].append(member)
             else:
-                self._namespace[node["name"]].appendleft(member)
+                self._namespace[node.name].appendleft(member)
 
         return old_path
 

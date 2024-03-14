@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 class Attributes:
@@ -81,7 +81,7 @@ class MethodAttributes(Attributes):
     TestClassTeardown: bool = False
     ParameterCombination: str = "exhaustive"
     TestParameterDefinition: str = ""
-    TestTags: list[str] = []
+    TestTags: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -98,5 +98,5 @@ class ClassdefAttributes(Attributes):
     Sealed: bool = False
 
     # https://mathworks.com/help/matlab/ref/matlab.unittest.testcase-class.html
-    SharedTestFixtures: list[str] = []
-    TestTags: list[str] = []
+    SharedTestFixtures: list[str] = field(default_factory=list)
+    TestTags: list[str] = field(default_factory=list)
