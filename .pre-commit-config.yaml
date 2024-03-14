@@ -18,9 +18,7 @@ repos:
       additional_dependencies: ["types-pyyaml"]
       exclude: |
         (?x)^(
-            example.py|
-            test\/.*.py|
-            docs\/.*.py
+            test\/.*.py
         )$
 
   - repo: https://github.com/python-poetry/poetry
