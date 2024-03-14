@@ -20,7 +20,6 @@ from .nodes import (
     Mex,
     Node,
     Package,
-    PathItem,
     Property,
     Script,
 )
@@ -37,7 +36,7 @@ _COMMENT_TOKENS = [
 
 def get_node(
     path: Path, parent: Node | None = None, in_class_folder: bool = False
-) -> PathItem | None:
+) -> Script | None:
     """
     Returns a Node object based on the given path.
 
@@ -80,7 +79,7 @@ def get_node(
 
         elif path.suffix == ".p":
             # TODO get docstring from .m helper path
-            return PathItem(name=path.stem, fqdm=fqdm, path=path, parent=parent)
+            return Script(name=path.stem, fqdm=fqdm, path=path, parent=parent)
         elif path.suffix == ".mlx":
             # TODO get docstring
             return LiveScript(name=path.stem, fqdm=fqdm, path=path, parent=None)
