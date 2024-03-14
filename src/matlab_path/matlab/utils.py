@@ -1,4 +1,3 @@
-
 from textmate_grammar.elements import ContentElement
 
 
@@ -70,7 +69,9 @@ def fix_indentation(docstring: dict[int, str]) -> str:
     if not docstring:
         return ""
     padding = [len(line) - len(line.lstrip()) for line in docstring.values()]
-    indent = min([pad for pad, line in zip(padding, docstring.values()) if not (line.isspace() or not line)])
+    indent = min(
+        [pad for pad, line in zip(padding, docstring.values()) if not (line.isspace() or not line)]
+    )
 
     for (i, line), pad in zip(docstring.items(), padding):
         docstring = line[indent:] if len(line) >= pad else line

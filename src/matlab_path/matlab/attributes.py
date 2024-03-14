@@ -26,8 +26,7 @@ class Attributes:
 
 @dataclass
 class ArgumentAttributes(Attributes):
-    """Argument block attributes
-    """
+    """Argument block attributes"""
 
     # https://mathworks.com/help/matlab/ref/arguments.html
     Output: bool = False
@@ -36,8 +35,7 @@ class ArgumentAttributes(Attributes):
 
 @dataclass
 class PropertyAttributes(Attributes):
-    """Class property attributes
-    """
+    """Class property attributes"""
 
     # https://mathworks.com/help/matlab/matlab_oop/property-attributes.html
     Abortset: bool = False
@@ -64,11 +62,9 @@ class PropertyAttributes(Attributes):
     ClassSetupParameter: bool = False
 
 
-
 @dataclass
 class MethodAttributes(Attributes):
-    """Class method attributes
-    """
+    """Class method attributes"""
 
     # https://mathworks.com/help/matlab/matlab_oop/method-attributes.html
     Abstract: bool = False
@@ -88,11 +84,9 @@ class MethodAttributes(Attributes):
     TestTags: list[str] = []
 
 
-
 @dataclass
 class ClassdefAttributes(Attributes):
-    """Class attributes
-    """
+    """Class attributes"""
 
     # https://mathworks.com/help/matlab/matlab_oop/class-attributes.html
     Abstract: bool = False

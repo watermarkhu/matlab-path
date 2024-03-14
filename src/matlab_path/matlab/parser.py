@@ -1,25 +1,58 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from typing import Protocol
 from pathlib import Path
+from typing import Protocol
 
 import texmate_grammar as tm
 from textmate_grammar.elements import ContentBlockElement, ContentElement
 
-from .nodes import *
+from .attributes import ArgumentAttributes, ClassdefAttributes, MethodAttributes, PropertyAttributes
+from .nodes import (
+    App,
+    Argument,
+    Classdef,
+    Function,
+    LiveScript,
+    Method,
+    Mex,
+    Node,
+    Package,
+    Property,
+    Script,
+)
 from .utils import append_block_comment, append_comment, append_section_comment, fix_indentation
 
 tm.utils.cache.init_cache("shelve")
 TM_PARSER = tm.language.LanguageParser(tm.grammars.matlab)
+_COMMENT_TOKENS = [
+    "comment.line.percentage.matlab",
+    "comment.block.percentage.matlab",
+    "comment.line.double-percentage.matlab",
+]
 
 
-def get_node(item: Path, parent: Node | None = None) -> Node:
+def get_node(path: Path, parent: Node | None = None) -> Node:
+    """
+    Returns a Node object based on the given path.
 
-    if item.is_file():
-        name = _resolve_name(item.stem, parent)
-        if item.suffix == ".m":
-            element = TM_PARSER.parse_file(item)
+    Args:
+        path (Path): The path to the file or directory.
+        parent (Node | None, optional): The parent node. Defaults to None.
+
+    Returns:
+        Node: The Node object representing the file or directory.
+
+    Raises:
+        Warning: If the file could not be parsed.
+
+    """
+    if path.is_file():
+        name = _resolve_name(path.stem, parent)
+        if path.suffix == ".m":
+            element = TM_PARSER.parse_file(path)
+            if element is None:
+                raise Warning(f"Could not parse {path}")
 
             try:
                 next(element.find("meta.class.matlab", depth=1))[0]
@@ -42,109 +75,122 @@ def get_node(item: Path, parent: Node | None = None) -> Node:
                 else:
                     parser = _parse_m_script
 
-            return parser(item, element)
-            
-        elif item.suffix == ".p":
-            # TODO get docstring from .m helper file
-            return Node(name=name, path=item, parent=parent)
-        elif item.suffix == ".mlx":
+            return parser(path, element, parent=parent)
+
+        elif path.suffix == ".p":
+            # TODO get docstring from .m helper path
+            return Node(name=name, path=path, parent=parent)
+        elif path.suffix == ".mlx":
             # TODO get docstring
-            return LiveScript(name=name, path=item, parent=None)
-        elif item.suffix == ".mlapp":
+            return LiveScript(name=name, path=path, parent=None)
+        elif path.suffix == ".mlapp":
             # TODO get docstring
-            return App(name=name, path=item, parent=None)
-        elif item.suffix in [".mex", ".mexa64", ".mexmaci64", ".mexw32", ".mexw64"]:
-            return Mex(name=name, path=item, parent=None)
-        
-    elif item.is_dir():
-        name = _resolve_name(item.stem[1:], parent)
-        if item.stem[0] == "+":
+            return App(name=name, path=path, parent=None)
+        elif path.suffix in [".mex", ".mexa64", ".mexmaci64", ".mexw32", ".mexw64"]:
+            return Mex(name=name, path=path, parent=None)
+
+    elif path.is_dir():
+        name = _resolve_name(path.stem[1:], parent)
+        if path.stem[0] == "+":
             # TODO get items of package
             # TODO get docstring from contents.m
-            return Package(name=item.stem, path=item, parent=parent)
-        elif item.stem[0] == "@":
+            return Package(name=name, path=path, parent=parent)
+        elif path.stem[0] == "@":
             # TODO get items of class folder
             # TODO get docstring from contents.m
-            return Classdef(name=item.stem, path=item, parent=parent, isclassfolder=True)
+            return Classdef(
+                name=name, classname=path.stem[1:], path=path, parent=parent, isclassfolder=True
+            )
 
-
-_COMMENT_TOKENS = [
-    "comment.line.percentage.matlab",
-    "comment.block.percentage.matlab",
-    "comment.line.double-percentage.matlab",
-]
 
 def _resolve_name(name: str, parent: Node | None) -> str:
+    """
+    Resolves the fully qualified name by appending the parent names.
+
+    Args:
+        name (str): The name to be resolved.
+        parent (Node | None): The parent node.
+
+    Returns:
+        str: The fully qualified name.
+    """
     while parent:
         name = f"{parent.name}.{name}"
         parent = parent.parent
     return name
 
-def _get_offset(element: ContentElement) -> int:
-    first_charater_position = next(iter(element.characters))
-    return first_charater_position[0]
+
+def _line_comment_to_docstring(element: ContentElement, docstring: dict[int, str]):
+    """
+    Converts a line comment to a docstring.
+
+    Args:
+        element (ContentElement): The line comment element.
+        docstring (dict[int, str]): The dictionary representing the docstring.
+
+    Returns:
+        None
+    """
+    first_charater_position = next(iter(element.characters))[0]
+    docstring[first_charater_position] = element.content[element.content.index("%") + 1 :]
 
 
 def _validate_token(element: ContentElement, token: str) -> None:
+    """
+    Validates the token of a given ContentElement.
+
+    Args:
+        element (ContentElement): The ContentElement to validate.
+        token (str): The token to compare against the element's token.
+
+    Raises:
+        ValueError: If the element's token does not match the provided token.
+    """
     if element.token != token:
         raise ValueError
 
 
-def _parse_m_script(file: Path, element: ContentBlockElement) -> Script:
+def _common_function_method(
+    node: Function | Method, element: ContentBlockElement, parent: Node | None = None
+):
+    """
+    This function is a helper function used internally in the parser module of the MATLAB path library.
+    It processes a common function or method and extracts input and output arguments, as well as any associated docstrings.
 
-    docstring: dict[int, str] = {}
-    for function_item, _ in element.find(_COMMENT_TOKENS, stop_tokens="*", depth=1):
-        if function_item.token == "comment.line.percentage.matlab":
-            append_comment(function_item, docstring)
-        elif function_item.token == "comment.line.double-percentage.matlab":
-            append_section_comment(function_item, docstring)
-        else:
-            # Block comments will take precedence over single % comments
-            append_block_comment(function_item, docstring)
-            break
-    fix_indentation(docstring)
-    return Script(name=file.stem, path=file, parent=None, docstring=docstring)
+    Parameters:
+        node (Function | Method): The function or method node to process.
+        element (ContentBlockElement): The content block element representing the function or method.
+        parent (Node | None, optional): The parent node of the function or method. Defaults to None.
 
+    Returns:
+        None
 
-def _parse_m_function(file: Path, element: ContentBlockElement, parent: Node | None = None) -> Function:
-
-    _validate_token(element, "meta.function.matlab")
-    name = _resolve_name(file.stem, parent)
-    node = Function(name=name, path=file, parent=parent)
-    _common_function_method(node, element, parent)
-
-
-def _parse_method(
-    parent: Classdef, 
-    element: ContentBlockElement, 
-    attributes: MethodAttributes) -> Method:
-
-    _validate_token(element, "meta.function.matlab")
-    declaration = next(element.find("meta.function.declaration.matlab", depth=1))[0]
-    local_name = next(declaration.find("entity.name.function.matlab"))[0].content
-    name = _resolve_name(local_name, parent)
-    node = Method(name=name, element=element, attributes=attributes, parent=parent)
-    _common_function_method(node, element, parent)
-
-
-def _common_function_method(node: Function | Method, element: ContentBlockElement, parent: Node | None = None) -> Function:
+    Raises:
+        None
+    """
+    # Function implementation goes here
 
     def _add_argument(
-        arg_item: ContentBlockElement,
+        arg_element: ContentBlockElement,
         attributes: ArgumentAttributes,
-        docstring_lines: list[str],
+        arg_docstring: dict[int, str],
     ):
-        arg = Property(arg_item, attributes=attributes, docstring_lines=docstring_lines)
+        _validate_token(arg_element, "meta.assignment.definition.property.matlab")
+        name = element.begin[0].content
 
         if attributes.Output:
-            node.output[arg.name] = arg
+            argument = node.output[name]
         else:
-            if "." in arg.name:
-                node.input.pop(arg.name.split(".")[0], None)
-                arg.name = arg.name.split(".")[1]
-                node.options[arg.name] = arg
+            if "." in name:
+                node.input.pop(name.split(".")[0], None)
+                argument = node.options[name.split(".")[1]]
             else:
-                node.input[arg.name] = arg
+                argument = node.input[name]
+
+        argument["attributes"] = attributes
+        _common_property_argument(node, arg_element, arg_docstring)
+
+    docstring: dict[int, str] = {}
 
     for function_item, _ in element.find(
         ["meta.function.declaration.matlab", "meta.arguments.matlab"] + _COMMENT_TOKENS,
@@ -154,7 +200,7 @@ def _common_function_method(node: Function | Method, element: ContentBlockElemen
             # Get input and output arguments from function declaration
 
             for variable, _ in function_item.find(
-                ["variable.parameter.output.matlab","variable.parameter.input.matlab"]
+                ["variable.parameter.output.matlab", "variable.parameter.input.matlab"]
             ):
                 if variable.token == "variable.parameter.input.matlab":
                     node["input"][variable.content] = Argument(variable.content, parent=node)
@@ -162,13 +208,13 @@ def _common_function_method(node: Function | Method, element: ContentBlockElemen
                     node["output"][variable.content] = Argument(variable.content, parent=node)
 
         elif function_item.token == "comment.block.percentage.matlab":
-            docstring_lines = append_block_comment(function_item)
+            append_block_comment(function_item, docstring)
 
         elif function_item.token == "comment.line.percentage.matlab":
-            append_comment(function_item, docstring_lines)
+            append_comment(function_item, docstring)
 
         elif function_item.token == "comment.line.double-percentage.matlab":
-            append_section_comment(function_item, docstring_lines)
+            append_section_comment(function_item, docstring)
 
         else:  # meta.arguments.matlab
             modifiers = {
@@ -177,11 +223,10 @@ def _common_function_method(node: Function | Method, element: ContentBlockElemen
                     "storage.modifier.arguments.matlab", attribute="begin"
                 )
             }
-            attributes = ArgumentAttributes(**modifiers)
+            attributes = ArgumentAttributes.from_dict(modifiers)
 
-            arg = None
-            arg_doc_parts: list[str] = []
-
+            arg_elem = None
+            arg_docstring: dict[int, str] = {}
             for arg_item, _ in function_item.find(
                 [
                     "meta.assignment.definition.property.matlab",
@@ -190,28 +235,35 @@ def _common_function_method(node: Function | Method, element: ContentBlockElemen
                 depth=1,
             ):
                 if arg_item.token == "meta.assignment.definition.property.matlab":
-                    if arg:
-                        _add_argument(arg, attributes, arg_doc_parts)
+                    if arg_elem:
+                        _add_argument(arg_elem, attributes, arg_docstring)
 
-                    arg_doc_parts = []
-                    arg = arg_item
+                    arg_docstring = {}
+                    arg_elem = arg_item
                 else:
-                    arg_doc_parts.append(arg_item.content[arg_item.content.index("%") + 1 :])
+                    _line_comment_to_docstring(arg_item, arg_docstring)
+
             else:
-                if arg:
-                    _add_argument(arg, attributes, arg_doc_parts)
-                    arg_doc_parts = []
+                if arg_elem:
+                    _add_argument(arg_elem, attributes, arg_docstring)
 
-    self._doc = parse_comment_docstring(docstring_lines)
-
-def _parse_m_classdef(file: Path, element: ContentBlockElement) -> Classdef:
-    pass
+    node["docstring"] = fix_indentation(docstring)
 
 
 def _common_property_argument(
-    node: Property | Argument,
-    element: ContentBlockElement, 
-    docstring: dict[int, str] = {}):
+    node: Property | Argument, element: ContentBlockElement, docstring: dict[int, str]
+):
+    """
+    Parses a common property or argument element and extracts relevant information.
+
+    Args:
+        node (Property | Argument): The node to store the extracted information.
+        element (ContentBlockElement): The element to parse.
+        docstring (dict[int, str]): The dictionary to store the extracted docstring.
+
+    Returns:
+        None
+    """
 
     if element.end:
         default_elements = element.findall(
@@ -229,8 +281,7 @@ def _common_property_argument(
         doc_elements = element.findall("comment.line.percentage.matlab", attribute="end")
 
         for el, _ in doc_elements:
-            index = next(el.charaters.keys())[0]
-            docstring[index] = el.content[1:]
+            _line_comment_to_docstring(el, docstring)
 
     node["docstring"] = fix_indentation(docstring)
 
@@ -249,263 +300,271 @@ def _common_property_argument(
         else:
             node["validators"] = [validator.content for validator in expression.children]
 
+
+def _parse_m_script(path: Path, element: ContentBlockElement, **kwargs) -> Script:
+    """
+    Parse an m-script file and return a Script object.
+
+    Args:
+        path (Path): The path to the m-script file.
+        element (ContentBlockElement): The content block element representing the m-script.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        Script: The parsed Script object.
+
+    """
+    docstring: dict[int, str] = {}
+    for function_item, _ in element.find(_COMMENT_TOKENS, stop_tokens="*", depth=1):
+        if function_item.token == "comment.line.percentage.matlab":
+            append_comment(function_item, docstring)
+        elif function_item.token == "comment.line.double-percentage.matlab":
+            append_section_comment(function_item, docstring)
+        else:
+            # Block comments will take precedence over single % comments
+            append_block_comment(function_item, docstring)
+            break
+    fix_indentation(docstring)
+    return Script(name=path.stem, path=path, parent=None, docstring=docstring)
+
+
+def _parse_m_function(
+    path: Path, element: ContentBlockElement, parent: Node | None = None
+) -> Function:
+    """
+    Parses an m-function from the given path and element.
+
+    Args:
+        path (Path): The path to the m-function file.
+        element (ContentBlockElement): The element representing the m-function.
+        parent (Node | None, optional): The parent node of the m-function. Defaults to None.
+
+    Returns:
+        Function: The parsed m-function node.
+
+    Raises:
+        ValidationError: If the element is not a valid m-function.
+
+    """
+    _validate_token(element, "meta.function.matlab")
+    name = _resolve_name(path.stem, parent)
+    node = Function(name=name, path=path, parent=parent)
+    _common_function_method(node, element, parent)
+
+
+def _parse_method(
+    parent: Classdef, element: ContentBlockElement, attributes: MethodAttributes
+) -> Method:
+    """
+    Parses a method from the given element and returns a Method object.
+
+    Args:
+        parent (Classdef): The parent Classdef object.
+        element (ContentBlockElement): The element to parse.
+        attributes (MethodAttributes): The attributes of the method.
+
+    Returns:
+        Method: The parsed Method object.
+    """
+    _validate_token(element, "meta.function.matlab")
+    declaration = next(element.find("meta.function.declaration.matlab", depth=1))[0]
+    name = next(declaration.find("entity.name.function.matlab"))[0].content
+    node = Method(name=name, attributes=attributes, parent=parent)
+    _common_function_method(node, element, parent)
+    if name != parent.classname or not attributes.Static:
+        node.input.popitem(last=False)
     return node
 
 
-def _parse_argument(
-    node: Argument, 
-    element: ContentBlockElement, 
-    attributes: ArgumentAttributes = ArgumentAttributes(), 
-    docstring: dict[int, str] = {}) -> Argument:
+def _parse_m_classdef(
+    path: Path, element: ContentBlockElement, parent: Node | None = None
+) -> Classdef:
+    """
+    Parses a MATLAB class definition.
 
-    _validate_token(element, "meta.assignment.definition.property.matlab")
-    name = _resolve_name(element.begin[0].content, parent)
-    node = Argument(name=name, parent=parent)
-    node["attributes"] = attributes
-    _common_property_argument(node, element, docstring)
-    return node
+    Args:
+        path (Path): The path of the MATLAB file containing the class definition.
+        element (ContentBlockElement): The content block element representing the class definition.
+        parent (Node | None, optional): The parent node of the class definition. Defaults to None.
 
+    Returns:
+        Classdef: The parsed class definition.
 
-def _parse_property(
-    parent: Classdef, 
-    element: ContentBlockElement, 
-    attributes: PropertyAttributes, 
-    docstring: dict[int, str] = {}) -> Property:
+    Raises:
+        None
 
-    _validate_token(element, "meta.assignment.definition.property.matlab")
-    name = _resolve_name(element.begin[0].content, parent)
-    node = Property(name=name, parent=parent)
-    node["attributes"] = attributes
-    _common_property_argument(node, element, docstring)
-    return node
+    """
 
+    def _add_property(
+        element: ContentBlockElement, attributes: PropertyAttributes, docstring: dict[int, str]
+    ) -> Property:
+        _validate_token(element, "meta.assignment.definition.property.matlab")
+        name = element.begin[0].content
+        prop = Property(name=name, parent=node)
+        prop["attributes"] = attributes
+        _common_property_argument(prop, element, docstring)
+        node.properties[name] = prop
 
+    _validate_token(element, "meta.class.matlab")
 
+    local_name = path.stem
+    name = _resolve_name(local_name, parent)
+    node = Classdef(name=name, classname=local_name, path=path, parent=parent)
 
+    docstring: dict[int, str] = {}
 
-
-
-class Method(Function):
-    def __init__(
-        self, element: ContentBlockElement, attributes: MethodAttributes, classdef: "Classdef"
+    for class_item, _ in node._element.find(
+        [
+            "meta.class.declaration.matlab",
+            "meta.properties.matlab",
+            "meta.enum.matlab",
+            "meta.methods.matlab",
+        ]
+        + _COMMENT_TOKENS,
+        depth=1,
     ):
-        self.validate_token(element)
-        self.element = element
-        self.attributes = attributes
-        self.classdef = classdef
-        self._process_elements(element)
+        if class_item.token == "meta.class.declaration.matlab":
+            modifiers = {}
+            current_modifier, current_value = "", True
 
-        if self.local_name != classdef.local_name or not attributes.Static:
-            self.input.popitem(last=False)
-
-
-class Classdef(MatObject):
-    _textmate_token = "meta.class.matlab"
-
-    def __init__(self, node: NamespaceNode) -> None:
-        self.validate_token(node._element)
-        self.node = node
-        self.offset = 0
-
-        self.local_name: str = ""
-        self.ancestors: list[str] = []
-        self.enumeration: dict[str, (str, str)] = dict()
-        self.methods: dict[str, Method] = dict()
-        self.properties: dict[str, Property] = dict()
-
-        docstring_lines: list[str] = []
-
-        for class_item, _ in node._element.find(
-            [
-                "meta.class.declaration.matlab",
-                "meta.properties.matlab",
-                "meta.enum.matlab",
-                "meta.methods.matlab",
-            ]
-            + _COMMENT_TOKENS,
-            depth=1,
-        ):
-            if class_item.token == "meta.class.declaration.matlab":
-                modifiers = {}
-                current_modifier, current_value = "", True
-
-                for attribute_item, _ in class_item.find(
-                    "*",
-                    start_tokens="punctuation.section.parens.begin.matlab",
-                    stop_tokens="punctuation.section.parens.end.matlab",
-                    depth=1,
-                ):
-                    if attribute_item.token == "punctuation.section.parens.begin.matlab":
-                        continue
-                    elif attribute_item.token == "storage.modifier.class.matlab":
-                        current_modifier = attribute_item.content
-                    elif attribute_item.token == "keyword.operator.assignment.matlab":
-                        current_value = ""
-                    elif attribute_item.token == "punctuation.separator.modifier.comma.matlab":
-                        modifiers[current_modifier], current_value = current_value, True
-                    elif attribute_item.token not in _COMMENT_TOKENS:
-                        current_value += attribute_item.content
-                else:
-                    if current_modifier:
-                        modifiers[current_modifier] = current_value
-
-                self._attributes = ClassdefAttributes.from_dict(modifiers)
-
-                declation_tokens = [
-                    "entity.name.type.class.matlab",
-                    "meta.inherited-class.matlab",
-                    "punctuation.definition.comment.matlab",
-                ]
-
-                for declation_item, _ in class_item.find(
-                    declation_tokens, start_tokens=declation_tokens, depth=1
-                ):
-                    if declation_item.token == "entity.name.type.class.matlab":
-                        self.local_name = declation_item.content
-                    elif declation_item.token == "meta.inherited-class.matlab":
-                        self.ancestors.append(declation_item.content)
-                    elif declation_item.token == "punctuation.definition.comment.matlab":
-                        docstring_lines.append(
-                            class_item.content[class_item.content.index("%") + 1 :]
-                        )
-            elif class_item.token == "comment.block.percentage.matlab":
-                docstring_lines = append_block_comment(class_item)
-
-            elif class_item.token == "comment.line.percentage.matlab":
-                append_comment(class_item, docstring_lines)
-
-            elif class_item.token == "comment.line.double-percentage.matlab":
-                append_section_comment(class_item, docstring_lines)
-
-            elif class_item.token == "meta.properties.matlab":
-                modifiers = {}
-                current_modifier, current_value = "", True
-                for modifier_item, _ in class_item.findall(
-                    "*", start_tokens="storage.modifier.properties.matlab", attribute="begin"
-                ):
-                    if modifier_item.token == "storage.modifier.properties.matlab":
-                        if current_modifier:
-                            modifiers[current_modifier], current_value = current_value, True
-                        current_modifier = modifier_item.content
-                    elif modifier_item.token == "keyword.operator.assignment.matlab":
-                        current_value = ""
-                    elif modifier_item.token not in _COMMENT_TOKENS:
-                        current_value += modifier_item.content
-                else:
-                    if current_modifier:
-                        modifiers[current_modifier] = current_value
-
-                attributes = PropertyAttributes.from_dict(modifiers)
-
-                prop = None
-                prop_doc_parts: list[str] = []
-                for prop_item, _ in class_item.find(
-                    [
-                        "meta.assignment.definition.property.matlab",
-                        "comment.line.percentage.matlab",
-                    ],
-                    depth=1,
-                ):
-                    if prop_item.token == "meta.assignment.definition.property.matlab":
-                        if prop:
-                            self._add_prop(prop, attributes, prop_doc_parts)
-
-                        prop_doc_parts = []
-                        prop = prop_item
-                    else:
-                        prop_doc_parts.append(prop_item.content[prop_item.content.index("%") + 1 :])
-                else:
-                    if prop:
-                        self._add_prop(prop, attributes, prop_doc_parts)
-                        prop_doc_parts = []
-
-            elif class_item.token == "meta.enum.matlab":
-                enum_doc_parts: list[str] = []
-                enum_name: str = ""
-                enum_value: str = ""
-                for enum_item, _ in class_item.find(
-                    [
-                        "meta.assignment.definition.enummember.matlab",
-                        "meta.parens.matlab",
-                        "comment.line.percentage.matlab",
-                    ],
-                    attribute="children",
-                ):
-                    if enum_item.token == "meta.assignment.definition.enummember.matlab":
-                        if enum_name:
-                            enum_doc = parse_comment_docstring(enum_doc_parts)
-                            self.enumeration[enum_name] = (enum_value, enum_doc)
-                            enum_doc_parts, enum_value = [], ""
-                        enum_name = next(enum_item.find("variable.other.enummember.matlab"))[
-                            0
-                        ].content
-
-                    elif enum_item.token == "meta.parens.matlab":
-                        enum_value = enum_item.content
-                    else:
-                        append_comment(enum_item, enum_doc_parts)
-                else:
-                    if enum_name:
-                        enum_doc = parse_comment_docstring(enum_doc_parts)
-                        self.enumeration[enum_name] = (enum_value, enum_doc)
-                        enum_doc_parts, enum_value = [], ""
-
+            for attribute_item, _ in class_item.find(
+                "*",
+                start_tokens="punctuation.section.parens.begin.matlab",
+                stop_tokens="punctuation.section.parens.end.matlab",
+                depth=1,
+            ):
+                if attribute_item.token == "punctuation.section.parens.begin.matlab":
+                    continue
+                elif attribute_item.token == "storage.modifier.class.matlab":
+                    current_modifier = attribute_item.content
+                elif attribute_item.token == "keyword.operator.assignment.matlab":
+                    current_value = ""
+                elif attribute_item.token == "punctuation.separator.modifier.comma.matlab":
+                    modifiers[current_modifier], current_value = current_value, True
+                elif attribute_item.token not in _COMMENT_TOKENS:
+                    current_value += attribute_item.content
             else:
-                modifiers = {}
-                current_modifier, current_value = "", True
-                for modifier_item, _ in class_item.findall(
-                    ["storage.modifier.methods.matlab", "storage.modifier.access.matlab"],
-                    attribute="begin",
-                ):
-                    if modifier_item.token == "storage.modifier.methods.matlab":
-                        if current_modifier:
-                            modifiers[current_modifier], current_value = current_value, True
-                        current_modifier = modifier_item.content
-                    else:
-                        current_value = modifier_item.content
-                else:
+                if current_modifier:
+                    modifiers[current_modifier] = current_value
+
+            node["attributes"] = ClassdefAttributes.from_dict(modifiers)
+
+            declation_tokens = [
+                "entity.name.type.class.matlab",
+                "meta.inherited-class.matlab",
+                "punctuation.definition.comment.matlab",
+            ]
+
+            for declation_item, _ in class_item.find(
+                declation_tokens, start_tokens=declation_tokens, depth=1
+            ):
+                if declation_item.token == "entity.name.type.class.matlab":
+                    node["classname"] = declation_item.content
+                elif declation_item.token == "meta.inherited-class.matlab":
+                    node["ancestors"].append(declation_item.content)
+                elif declation_item.token == "punctuation.definition.comment.matlab":
+                    _line_comment_to_docstring(class_item, docstring)
+
+        elif class_item.token == "comment.block.percentage.matlab":
+            append_block_comment(class_item, docstring)
+
+        elif class_item.token == "comment.line.percentage.matlab":
+            append_comment(class_item, docstring)
+
+        elif class_item.token == "comment.line.double-percentage.matlab":
+            append_section_comment(class_item, docstring)
+
+        elif class_item.token == "meta.properties.matlab":
+            modifiers = {}
+            current_modifier, current_value = "", True
+            for modifier_item, _ in class_item.findall(
+                "*", start_tokens="storage.modifier.properties.matlab", attribute="begin"
+            ):
+                if modifier_item.token == "storage.modifier.properties.matlab":
                     if current_modifier:
-                        modifiers[current_modifier] = current_value
+                        modifiers[current_modifier], current_value = current_value, True
+                    current_modifier = modifier_item.content
+                elif modifier_item.token == "keyword.operator.assignment.matlab":
+                    current_value = ""
+                elif modifier_item.token not in _COMMENT_TOKENS:
+                    current_value += modifier_item.content
+            else:
+                if current_modifier:
+                    modifiers[current_modifier] = current_value
 
-                attributes = MethodAttributes.from_dict(modifiers)
+            attributes = PropertyAttributes.from_dict(modifiers)
 
-                for method_item, _ in class_item.find("meta.function.matlab", depth=1):
-                    method = Method(method_item, attributes, self)
-                    self.methods[method.local_name] = method
+            prop_elem = None
+            prop_docstring: dict[int, str] = {}
+            for prop_item, _ in class_item.find(
+                [
+                    "meta.assignment.definition.property.matlab",
+                    "comment.line.percentage.matlab",
+                ],
+                depth=1,
+            ):
+                if prop_item.token == "meta.assignment.definition.property.matlab":
+                    if prop_elem:
+                        _add_property(prop_elem, attributes, prop_docstring)
 
-        self._doc = parse_comment_docstring(docstring_lines)
+                    prop_docstring = {}
+                    prop_elem = prop_item
+                else:
+                    _line_comment_to_docstring(prop_item, prop_docstring)
+            else:
+                if prop_elem:
+                    _add_property(prop_elem, attributes, prop_docstring)
 
-    def _add_prop(
-        self,
-        prop_item: ContentBlockElement,
-        attributes: ArgumentAttributes | PropertyAttributes,
-        docstring_lines: list[str],
-    ):
-        prop = Property(prop_item, attributes=attributes, docstring_lines=docstring_lines)
-        self.properties[prop.name] = prop
+        elif class_item.token == "meta.enum.matlab":
+            enum_docstring: dict[int, str] = {}
+            enum_name: str = ""
+            enum_value: str = ""
+            for enum_item, _ in class_item.find(
+                [
+                    "meta.assignment.definition.enummember.matlab",
+                    "meta.parens.matlab",
+                    "comment.line.percentage.matlab",
+                ],
+                attribute="children",
+            ):
+                if enum_item.token == "meta.assignment.definition.enummember.matlab":
+                    if enum_name:
+                        enum_doc = fix_indentation(enum_docstring)
+                        node["enumeration"][enum_name] = (enum_value, enum_doc)
+                        enum_docstring, enum_value = {}, ""
 
-    def doc(self, config: Config) -> str:
-        docstring = self._doc
-        if config.class_docstring == "merge" and self.local_name in self.methods:
-            constructor_docstring = self.methods[self.local_name].doc(config)
-            if docstring and constructor_docstring:
-                docstring += "\n\n"
-            docstring += constructor_docstring
+                    enum_name = next(enum_item.find("variable.other.enummember.matlab"))[0].content
 
-        if self.enumeration:
-            docstring = append_enum_table(
-                self.enumeration, docstring, renderer=config.render_plugin
-            )
+                elif enum_item.token == "meta.parens.matlab":
+                    enum_value = enum_item.content
+                else:
+                    append_comment(enum_item, enum_docstring)
+            else:
+                if enum_name:
+                    enum_doc = fix_indentation(enum_docstring)
+                    node["enumeration"][enum_name] = (enum_value, enum_doc)
 
-        if config.class_properties_table:
-            public_properties = {
-                name: prop
-                for (name, prop) in self.properties.items()
-                if prop._attributes.Access == "public" or prop._attributes.GetAccess == "public"
-            }
-            if public_properties:
-                docstring = append_validation_table(
-                    public_properties, docstring, renderer=config.render_plugin, title="Properties"
-                )
+        else:  # meta.methods.matlab
+            modifiers = {}
+            current_modifier, current_value = "", True
+            for modifier_item, _ in class_item.findall(
+                ["storage.modifier.methods.matlab", "storage.modifier.access.matlab"],
+                attribute="begin",
+            ):
+                if modifier_item.token == "storage.modifier.methods.matlab":
+                    if current_modifier:
+                        modifiers[current_modifier], current_value = current_value, True
+                    current_modifier = modifier_item.content
+                else:
+                    current_value = modifier_item.content
+            else:
+                if current_modifier:
+                    modifiers[current_modifier] = current_value
 
-        return docstring
+            attributes = MethodAttributes.from_dict(modifiers)
+
+            for method_elem, _ in class_item.find("meta.function.matlab", depth=1):
+                method = _parse_method(node, method_elem, attributes)
+                node["methods"][method.name] = method
+
+    node["docstring"] = fix_indentation(docstring)
