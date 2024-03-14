@@ -32,7 +32,7 @@ class SearchPath:
             if not isinstance(path, (str, Path)):
                 raise TypeError(f"Expected str or Path, got {type(path)}")
 
-        self._search_path: deque[Path] = []
+        self._search_path: deque[Path] = deque()
         self._path_members: dict[Path, list[tuple[str, Path]]] = defaultdict(list)
         self._namespace: dict[str, deque[Path]] = defaultdict(deque)
         self._database: dict[Path, Node] = {}
@@ -65,6 +65,9 @@ class SearchPath:
         Returns:
             list[Path]: The previous search path before adding the new path.
         """
+        if isinstance(path, str):
+            path = Path(path)
+
         old_path = [p for p in self._search_path]
 
         if path in self._search_path:
@@ -77,12 +80,14 @@ class SearchPath:
 
         for member in path.iterdir():
             node = get_node(member)
-            self._path_members(path).append((node.name, member))
+            if node is None:
+                continue
+            self._path_members[path].append((node["name"], member))
             self._database[member] = node
             if to_end:
-                self._namespace[node.name].append(member)
+                self._namespace[node["name"]].append(member)
             else:
-                self._namespace[node.name].appendleft(member)
+                self._namespace[node["name"]].appendleft(member)
 
         return old_path
 
@@ -97,8 +102,11 @@ class SearchPath:
             list[Path]: The previous search path before the removal.
 
         """
+        if isinstance(path, str):
+            path = Path(path)
+
         if path not in self._search_path:
-            return self._search_path
+            return list(self._search_path)
 
         old_path = [p for p in self._search_path]
 

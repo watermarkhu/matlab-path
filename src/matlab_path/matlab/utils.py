@@ -13,8 +13,8 @@ def append_comment(elem: ContentElement, docstring: dict[int, str]) -> dict[int,
         dict[int, str]: The updated docstring with the appended comment.
     """
     content = elem.content[elem.content.index("%") + 1 :]
-    index = next(elem.charaters.keys())[0]
-    docstring[index] = content
+    pos = list(elem.characters.keys())[0]
+    docstring[pos[0]] = content
     return docstring
 
 
@@ -30,8 +30,8 @@ def append_section_comment(elem: ContentElement, docstring: dict[int, str]) -> d
         dict[int, str]: The updated docstring with the section comment appended.
     """
     content = elem.content[elem.content.index("%%") + 2 :]
-    index = next(elem.charaters.keys())[0]
-    docstring[index] = content
+    pos = list(elem.characters.keys())[0]
+    docstring[pos[0]] = content
     return docstring
 
 
@@ -49,13 +49,14 @@ def append_block_comment(elem: ContentElement, docstring: dict[int, str]) -> dic
     bracket = elem.content.index("%{") + 2
     begin = elem.content[bracket:].index("\n") + bracket + 1
     content = elem.content[begin : elem.content.index("%}")]
-    index = next(elem.charaters.keys())[0] + 1
+    pos = list(elem.characters.keys())[0]
+    index = pos[0] + 1
     for i, line in enumerate(content.split("\n")):
         docstring[index + i] = line
     return docstring
 
 
-def fix_indentation(docstring: dict[int, str]) -> str:
+def fix_indentation(docstring: dict[int, str]) -> dict[int, str]:
     """
     Fixes the indentation of a multi-line docstring.
 
@@ -67,13 +68,12 @@ def fix_indentation(docstring: dict[int, str]) -> str:
 
     """
     if not docstring:
-        return ""
+        return {}
     padding = [len(line) - len(line.lstrip()) for line in docstring.values()]
     indent = min(
         [pad for pad, line in zip(padding, docstring.values()) if not (line.isspace() or not line)]
     )
 
     for (i, line), pad in zip(docstring.items(), padding):
-        docstring = line[indent:] if len(line) >= pad else line
-        docstring[i] = line.rstrip()
+        docstring[i] = line[indent:].rstrip() if len(line) >= pad else line.rstrip()
     return docstring

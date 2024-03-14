@@ -8,7 +8,7 @@ class Attributes:
             if value is None:
                 settings[key] = True
                 continue
-            annotation = cls.__annotations__.get(key)
+            annotation = cls.__annotations__.get(key, bool)
             match annotation.__qualname__:
                 case "bool":
                     if value in ["True", "true", "t", 1]:
