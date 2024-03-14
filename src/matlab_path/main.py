@@ -54,7 +54,9 @@ class SearchPath:
             return self._database[self._namespace[name][0]]
         return None
 
-    def addpath(self, path: str | Path, to_end: bool = False) -> list[Path]:
+    def addpath(
+        self, path: str | Path, to_end: bool = False, recursive: bool = False
+    ) -> list[Path]:
         """
         Add a path to the search path.
 
@@ -79,24 +81,29 @@ class SearchPath:
             self._search_path.appendleft(path)
 
         for member in path.iterdir():
+            if recursive and member.is_dir() and member.stem[0] not in ["+", "@"]:
+                self.addpath(member, to_end=to_end, recursive=True)
+                continue
+
             node = get_node(member)
             if node is None:
                 continue
-            self._path_members[path].append((node.name, member))
+            self._path_members[path].append((node.fqdm, member))
             self._database[member] = node
             if to_end:
-                self._namespace[node.name].append(member)
+                self._namespace[node.fqdm].append(member)
             else:
-                self._namespace[node.name].appendleft(member)
+                self._namespace[node.fqdm].appendleft(member)
 
         return old_path
 
-    def rm_path(self, path: str | Path) -> list[Path]:
+    def rm_path(self, path: str | Path, recursive: bool = False) -> list[Path]:
         """
         Removes a path from the search path and updates the namespace and database accordingly.
 
         Args:
             path (str | Path): The path to be removed from the search path.
+            recursive (bool, optional): If True, recursively removes all subdirectories of the given path from the search path. Defaults to False.
 
         Returns:
             list[Path]: The previous search path before the removal.
@@ -116,4 +123,17 @@ class SearchPath:
             self._namespace[name].remove(member)
             self._database.pop(member)
 
+        if recursive:
+            for subdir in [item for item in self._search_path if _is_subdirectory(path, item)]:
+                self.rm_path(subdir, recursive=False)
+
         return old_path
+
+
+def _is_subdirectory(parent_path: Path, child_path: Path) -> bool:
+    try:
+        child_path.relative_to(parent_path)
+    except ValueError:
+        return False
+    else:
+        return True

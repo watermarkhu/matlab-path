@@ -15,6 +15,11 @@ class Node:
 
 
 @dataclass
+class PathItem(Node):
+    fqdm: str = ""
+
+
+@dataclass
 class Script(Node):
     docstring: dict[int, str] = field(default_factory=dict)
 
@@ -43,21 +48,20 @@ class Enum(Script):
 
 
 @dataclass
-class Function(Script):
+class Function(Script, PathItem):
     input: OrderedDict[str, Argument] = field(default_factory=OrderedDict)
     output: OrderedDict[str, Argument] = field(default_factory=OrderedDict)
     options: dict[str, Argument] = field(default_factory=dict)
 
 
 @dataclass
-class Method(Function):
+class Method(Function, PathItem):
     attributes: MethodAttributes = field(default_factory=MethodAttributes)
 
 
 @dataclass
-class Classdef(Script):
+class Classdef(Script, PathItem):
     isclassfolder: bool = False
-    classname: str = ""
     ancestors: list[str] = field(default_factory=list)
     enumeration: list[Enum] = field(default_factory=list)
     methods: dict[str, Method] = field(default_factory=dict)
@@ -66,18 +70,19 @@ class Classdef(Script):
 
 
 @dataclass
-class Package(Script):
-    classes: dict[str, Classdef] = field(default_factory=dict)
-    functions: dict[str, Function] = field(default_factory=dict)
+class Package(Script, PathItem):
+    classes: list[Classdef] = field(default_factory=list)
+    functions: list[Function] = field(default_factory=list)
+    packages: list[Package] = field(default_factory=list)
 
 
 @dataclass
-class LiveScript(Script): ...
+class LiveScript(Script, PathItem): ...
 
 
 @dataclass
-class App(Script): ...
+class App(Script, PathItem): ...
 
 
 @dataclass
-class Mex(Node): ...
+class Mex(PathItem): ...

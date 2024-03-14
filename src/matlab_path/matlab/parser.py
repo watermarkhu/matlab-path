@@ -20,6 +20,7 @@ from .nodes import (
     Mex,
     Node,
     Package,
+    PathItem,
     Property,
     Script,
 )
@@ -34,7 +35,9 @@ _COMMENT_TOKENS = [
 ]
 
 
-def get_node(path: Path, parent: Node | None = None) -> Node | None:
+def get_node(
+    path: Path, parent: Node | None = None, in_class_folder: bool = False
+) -> PathItem | None:
     """
     Returns a Node object based on the given path.
 
@@ -50,15 +53,14 @@ def get_node(path: Path, parent: Node | None = None) -> Node | None:
 
     """
     if path.is_file():
-        name = _resolve_name(path.stem, parent)
+        fqdm = _fully_qualified_domain_name(path.stem, parent)
         if path.suffix == ".m":
             element = TM_PARSER.parse_file(path)
             if element is None:
                 raise Warning(f"Could not parse {path}")
-
             try:
-                item = next(element.find("meta.class.matlab", depth=1))[0]
-                parser: Callable[[Path, ContentBlockElement, Node | None], Node] = _parse_m_classdef
+                class_elem = next(element.find("meta.class.matlab", depth=1))[0]
+                return _parse_m_classdef(path, class_elem, parent)  # type: ignore
             except StopIteration:
                 generator = element.find(
                     [
@@ -72,43 +74,101 @@ def get_node(path: Path, parent: Node | None = None) -> Node | None:
                 )
                 for item, _ in generator:
                     if item.token == "meta.function.matlab":
-                        parser = _parse_m_function
-                        break
+                        return _parse_m_function(path, item, parent, in_class_folder)  # type: ignore
                 else:
-                    item = element
-                    parser = _parse_m_script
-
-            return parser(path, item, parent)  # type: ignore
+                    return _parse_m_script(path, element, parent)  # type: ignore
 
         elif path.suffix == ".p":
             # TODO get docstring from .m helper path
-            return Node(name=name, path=path, parent=parent)
+            return PathItem(name=path.stem, fqdm=fqdm, path=path, parent=parent)
         elif path.suffix == ".mlx":
             # TODO get docstring
-            return LiveScript(name=name, path=path, parent=None)
+            return LiveScript(name=path.stem, fqdm=fqdm, path=path, parent=None)
         elif path.suffix == ".mlapp":
             # TODO get docstring
-            return App(name=name, path=path, parent=None)
+            return App(name=path.stem, fqdm=fqdm, path=path, parent=None)
         elif path.suffix in [".mex", ".mexa64", ".mexmaci64", ".mexw32", ".mexw64"]:
-            return Mex(name=name, path=path, parent=None)
+            return Mex(name=path.stem, fqdm=fqdm, path=path, parent=None)
 
-    elif path.is_dir():
-        name = _resolve_name(path.stem[1:], parent)
-        if path.stem[0] == "+":
-            # TODO get items of package
-            # TODO get docstring from contents.m
-            return Package(name=name, path=path, parent=parent)
-        elif path.stem[0] == "@":
-            # TODO get items of class folder
-            # TODO get docstring from contents.m
-            return Classdef(
-                name=name, classname=path.stem[1:], path=path, parent=parent, isclassfolder=True
-            )
+    elif path.is_dir() and path.stem[0] == "+":
+        return _parse_dir_package(path, parent)
+    elif path.is_dir() and path.stem[0] == "@":
+        return _parse_dir_classdef(path, parent)
 
     return None
 
 
-def _resolve_name(name: str, parent: Node | None) -> str:
+def _parse_dir_classdef(path: Path, parent: Node | None = None) -> Classdef | None:
+    """
+    Parses a directory classdef and returns a Classdef object.
+
+    Args:
+        path (Path): The path to the directory classdef.
+        parent (Node | None, optional): The parent node of the directory classdef. Defaults to None.
+
+    Returns:
+        Classdef: The parsed directory classdef.
+
+    """
+    class_definition = path / f"{path.stem}.m"
+
+    if not class_definition.exists():
+        return None
+
+    element = TM_PARSER.parse_file(path)
+    if element is None:
+        return None
+
+    class_elem = next(element.find("meta.class.matlab", depth=1))[0]
+    node = _parse_m_classdef(path, class_elem, parent)  # type: ignore
+
+    for member in path.iterdir():
+        if member.is_file():
+            child = get_node(member, node, in_class_folder=True)
+            if isinstance(child, Method):
+                node.methods[child.name] = child
+
+    return node
+
+
+def _parse_dir_package(path: Path, parent: Node | None = None) -> Package:
+    """
+    Parses a directory package and returns a Package object.
+
+    Args:
+        path (Path): The path to the directory package.
+        parent (Node | None, optional): The parent node of the directory package. Defaults to None.
+
+    Returns:
+        Package: The parsed directory package.
+
+    """
+    name = _fully_qualified_domain_name(path.stem[1:], parent)
+    node = Package(name=name, path=path, parent=parent)
+
+    for member in path.iterdir():
+        if member.is_file():
+            child = get_node(member, node)
+
+            if member.stem == "Contents" and isinstance(child, Script):
+                node.docstring = child.docstring
+            if isinstance(child, Function):
+                node.functions.append(child)
+            elif isinstance(child, Classdef):
+                node.classes.append(child)
+        elif member.is_dir() and member.stem[0] == "+":
+            child = _parse_dir_package(member, node)
+            if child is not None:
+                node.packages.append(child)
+        elif member.is_dir() and member.stem[0] == "@":
+            child = _parse_dir_classdef(member, node)
+            if child is not None:
+                node.classes.append(child)
+
+    return node
+
+
+def _fully_qualified_domain_name(name: str, parent: Node | None) -> str:
     """
     Resolves the fully qualified name by appending the parent names.
 
@@ -338,7 +398,10 @@ def _parse_m_script(path: Path, element: ContentBlockElement, parent: Node | Non
 
 
 def _parse_m_function(
-    path: Path, element: ContentBlockElement, parent: Node | None = None
+    path: Path,
+    element: ContentBlockElement,
+    parent: Node | None = None,
+    in_class_folder: bool = False,
 ) -> Function:
     """
     Parses an m-function from the given path and element.
@@ -356,8 +419,11 @@ def _parse_m_function(
 
     """
     _validate_token(element, "meta.function.matlab")
-    name = _resolve_name(path.stem, parent)
-    node = Function(name=name, path=path, parent=parent)
+    fqdm = _fully_qualified_domain_name(path.stem, parent)
+    if not in_class_folder:
+        node = Function(name=path.stem, fqdm=fqdm, path=path, parent=parent)
+    else:
+        node = Method(name=path.stem, fqdm=fqdm, path=path, parent=parent)
     _common_function_method(node, element, parent)
     return node
 
@@ -379,9 +445,10 @@ def _parse_method(
     _validate_token(element, "meta.function.matlab")
     declaration = next(element.find("meta.function.declaration.matlab", depth=1))[0]
     name = next(declaration.find("entity.name.function.matlab"))[0].content
-    node = Method(name=name, attributes=attributes, parent=parent, path=parent.path)
+    fqdm = _fully_qualified_domain_name(name, parent)
+    node = Method(name=name, fqdm=fqdm, attributes=attributes, parent=parent, path=parent.path)
     _common_function_method(node, element, parent)
-    if name != parent.classname or not attributes.Static:
+    if name != parent.name or not attributes.Static:
         node.input.popitem(last=False)
     return node
 
@@ -417,9 +484,8 @@ def _parse_m_classdef(
 
     _validate_token(element, "meta.class.matlab")
 
-    local_name = path.stem
-    name = _resolve_name(local_name, parent)
-    node = Classdef(name=name, classname=local_name, path=path, parent=parent)
+    fqdm = _fully_qualified_domain_name(path.stem, parent)
+    node = Classdef(name=path.stem, fqdm=fqdm, path=path, parent=parent)
 
     docstring: dict[int, str] = {}
 
@@ -469,7 +535,7 @@ def _parse_m_classdef(
                 declation_tokens, start_tokens=declation_tokens, depth=1
             ):
                 if declation_item.token == "entity.name.type.class.matlab":
-                    node.classname = declation_item.content
+                    node.name = declation_item.content
                 elif declation_item.token == "meta.inherited-class.matlab":
                     node.ancestors.append(declation_item.content)
                 elif declation_item.token == "punctuation.definition.comment.matlab":
