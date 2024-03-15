@@ -12,7 +12,7 @@ packages = [{include = "matlab_path", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-textmate-grammar-python = "^0.3.0"
+textmate-grammar-python = { path = "../textmate-grammar-python/", develop = true }
 
 [tool.poetry.group.test.dependencies]
 pytest = ">=7.3.1,<9.0.0"

@@ -1,7 +1,7 @@
 from collections import defaultdict, deque
 from pathlib import Path
 
-from .matlab.nodes import Node
+from .matlab.nodes import Node, Package
 from .matlab.parser import get_node
 
 
@@ -35,28 +35,36 @@ class SearchPath:
         self._search_path: deque[Path] = deque()
         self._path_members: dict[Path, list[tuple[str, Path]]] = defaultdict(list)
         self._namespace: dict[str, deque[Path]] = defaultdict(deque)
+        self._local_namespaces: dict[Path, dict[str, Path]] = defaultdict(dict)
         self._database: dict[Path, Node] = {}
 
         for path in matlab_path:
             self.addpath(Path(path), to_end=True)
 
-    def resolve(self, name: str) -> Node | None:
+    def resolve(self, name: str, local_namespaces: list[str | Path] | None = None) -> Node | None:
         """
         Resolves the given name to a Node object.
 
         Args:
             name (str): The name to resolve.
+            local_namespaces (list[str | Path] | None, optional): A list of local namespaces to search in. Defaults to None.
 
         Returns:
             Node | None: The resolved Node object, or None if the name is not found.
         """
+        # Resolve local namespaces first
+        if local_namespaces is not None:
+            for str_path in local_namespaces:
+                path = Path(str_path)
+                if path in self._local_namespaces and name in self._local_namespaces[path]:
+                    return self._database[self._local_namespaces[path][name]]
+
+        # Find in global database
         if name in self._namespace:
             return self._database[self._namespace[name][0]]
         return None
 
-    def addpath(
-        self, path: str | Path, to_end: bool = False, recursive: bool = False
-    ) -> list[Path]:
+    def addpath(self, path: str | Path, to_end: bool = False, recursive: bool = False):
         """
         Add a path to the search path.
 
@@ -69,8 +77,6 @@ class SearchPath:
         """
         if isinstance(path, str):
             path = Path(path)
-
-        old_path = [p for p in self._search_path]
 
         if path in self._search_path:
             self._search_path.remove(path)
@@ -85,19 +91,51 @@ class SearchPath:
                 self.addpath(member, to_end=to_end, recursive=True)
                 continue
 
+            if member.is_file() and member.name == "Contents.m":
+                # ignore contents.m files except in package/class folders
+                continue
+
             node = get_node(member)
             if node is None:
                 continue
             self._path_members[path].append((node.fqdm, member))
             self._database[member] = node
-            if to_end:
-                self._namespace[node.fqdm].append(member)
+
+            if path.stem == "private":
+                self._local_namespaces[path.parent][node.fqdm] = member
             else:
-                self._namespace[node.fqdm].appendleft(member)
+                if to_end:
+                    self._namespace[node.fqdm].append(member)
+                else:
+                    self._namespace[node.fqdm].appendleft(member)
 
-        return old_path
+            if isinstance(node, Package):
+                self._add_package_to_local_namespace(member, node, to_end=to_end)
 
-    def rm_path(self, path: str | Path, recursive: bool = False) -> list[Path]:
+    def _add_package_to_local_namespace(self, path: Path, package: Package, to_end: bool = False):
+        """
+        Adds a package and its contents to the local namespace.
+
+        Args:
+            path (Path): The path of the package.
+            package (Package): The package object containing classes, functions, and sub-packages.
+            to_end (bool, optional): Determines whether to add the package to the end of the namespace.
+                Defaults to False, which adds the package to the beginning of the namespace.
+
+        Returns:
+            None
+        """
+        for item in package.classes + package.functions + package.packages:
+            self._local_namespaces[path][item.name] = item.path
+            if to_end:
+                self._namespace[item.fqdm].append(item.path)
+            else:
+                self._namespace[item.fqdm].appendleft(item.path)
+            self._database[item.path] = item
+        for subpackage in package.packages:
+            self._add_package_to_local_namespace(subpackage.path, subpackage)
+
+    def rm_path(self, path: str | Path, recursive: bool = False):
         """
         Removes a path from the search path and updates the namespace and database accordingly.
 
@@ -115,8 +153,6 @@ class SearchPath:
         if path not in self._search_path:
             return list(self._search_path)
 
-        old_path = [p for p in self._search_path]
-
         self._search_path.remove(path)
 
         for name, member in self._path_members.pop(path):
@@ -126,8 +162,6 @@ class SearchPath:
         if recursive:
             for subdir in [item for item in self._search_path if _is_subdirectory(path, item)]:
                 self.rm_path(subdir, recursive=False)
-
-        return old_path
 
 
 def _is_subdirectory(parent_path: Path, child_path: Path) -> bool:

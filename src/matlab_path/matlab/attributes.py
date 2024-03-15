@@ -29,8 +29,15 @@ class ArgumentAttributes(Attributes):
     """Argument block attributes"""
 
     # https://mathworks.com/help/matlab/ref/arguments.html
+    Input: bool = True
     Output: bool = False
     Repeating: bool = False
+
+    @property
+    def is_input(self):
+        if self.Output:
+            return False
+        return self.Input
 
 
 @dataclass

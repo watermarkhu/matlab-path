@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Callable
 
@@ -25,12 +26,19 @@ from .nodes import (
 )
 from .utils import append_block_comment, append_comment, append_section_comment, fix_indentation
 
+logging.getLogger("textmate_grammar").setLevel(logging.ERROR)
 cache.init_cache("shelve")
+
 TM_PARSER = LanguageParser(matlab.GRAMMAR)
 _COMMENT_TOKENS = [
     "comment.line.percentage.matlab",
     "comment.block.percentage.matlab",
     "comment.line.double-percentage.matlab",
+]
+_STOP_TOKENS = [
+    "meta.function.matlab",  # Nested functions
+    "meta.function-call.parens.matlab",  # Function call
+    "meta.assignment.variable.single.matlab",  # Assignment
 ]
 
 
@@ -54,9 +62,13 @@ def get_node(
     if path.is_file():
         fqdm = _fully_qualified_domain_name(path.stem, parent)
         if path.suffix == ".m":
-            element = TM_PARSER.parse_file(path)
+            try:
+                element = TM_PARSER.parse_file(path)
+            except IndexError:
+                return None
+
             if element is None:
-                raise Warning(f"Could not parse {path}")
+                return None
             try:
                 class_elem = next(element.find("meta.class.matlab", depth=1))[0]
                 return _parse_m_classdef(path, class_elem, parent)  # type: ignore
@@ -109,21 +121,25 @@ def _parse_dir_classdef(path: Path, parent: Node | None = None) -> Classdef | No
         Classdef: The parsed directory classdef.
 
     """
-    class_definition = path / f"{path.stem}.m"
+    class_definition = path / f"{path.stem[1:]}.m"
 
     if not class_definition.exists():
         return None
 
-    element = TM_PARSER.parse_file(path)
+    element = TM_PARSER.parse_file(class_definition)
     if element is None:
         return None
 
     class_elem = next(element.find("meta.class.matlab", depth=1))[0]
-    node = _parse_m_classdef(path, class_elem, parent)  # type: ignore
+    node = _parse_m_classdef(class_definition, class_elem, parent)  # type: ignore
 
     for member in path.iterdir():
-        if member.is_file():
+        if member.is_file() and member != class_definition:
+            if member.name == "Contents.m":
+                continue
+
             child = get_node(member, node, in_class_folder=True)
+
             if isinstance(child, Method):
                 node.methods[child.name] = child
 
@@ -142,14 +158,14 @@ def _parse_dir_package(path: Path, parent: Node | None = None) -> Package:
         Package: The parsed directory package.
 
     """
-    name = _fully_qualified_domain_name(path.stem[1:], parent)
-    node = Package(name=name, path=path, parent=parent)
+    fqdm = _fully_qualified_domain_name(path.stem[1:], parent)
+    node = Package(name=path.stem[1:], fqdm=fqdm, path=path, parent=parent)
 
     for member in path.iterdir():
         if member.is_file():
             child = get_node(member, node)
 
-            if member.stem == "Contents" and isinstance(child, Script):
+            if member.name == "Contents.m" and isinstance(child, Script):
                 node.docstring = child.docstring
             if isinstance(child, Function):
                 node.functions.append(child)
@@ -240,7 +256,7 @@ def _common_function_method(
         arg_docstring: dict[int, str],
     ):
         _validate_token(arg_element, "meta.assignment.definition.property.matlab")
-        name = element.begin[0].content
+        name = arg_element.begin[0].content
 
         if attributes.Output:
             argument = node.output[name]
@@ -258,6 +274,7 @@ def _common_function_method(
 
     for function_item, _ in element.find(
         ["meta.function.declaration.matlab", "meta.arguments.matlab"] + _COMMENT_TOKENS,
+        stop_tokens=_STOP_TOKENS,
         depth=1,
     ):
         if function_item.token == "meta.function.declaration.matlab":
@@ -393,7 +410,7 @@ def _parse_m_script(path: Path, element: ContentBlockElement, parent: Node | Non
             append_block_comment(function_item, docstring)
             break
     fix_indentation(docstring)
-    return Script(name=path.stem, path=path, parent=None, docstring=docstring)
+    return Script(name=path.stem, fqdm=path.stem, path=path, parent=None, docstring=docstring)
 
 
 def _parse_m_function(
@@ -447,9 +464,15 @@ def _parse_method(
     fqdm = _fully_qualified_domain_name(name, parent)
     node = Method(name=name, fqdm=fqdm, attributes=attributes, parent=parent, path=parent.path)
     _common_function_method(node, element, parent)
-    if name != parent.name or not attributes.Static:
-        node.input.popitem(last=False)
     return node
+
+
+_CLASS_TOKENS = [
+    "meta.class.declaration.matlab",
+    "meta.properties.matlab",
+    "meta.enum.matlab",
+    "meta.methods.matlab",
+]
 
 
 def _parse_m_classdef(
@@ -488,16 +511,7 @@ def _parse_m_classdef(
 
     docstring: dict[int, str] = {}
 
-    for class_item, _ in element.find(
-        [
-            "meta.class.declaration.matlab",
-            "meta.properties.matlab",
-            "meta.enum.matlab",
-            "meta.methods.matlab",
-        ]
-        + _COMMENT_TOKENS,
-        depth=1,
-    ):
+    for class_item, _ in element.find(_CLASS_TOKENS, depth=1):
         if class_item.token == "meta.class.declaration.matlab":
             modifiers = {}
             current_modifier, current_value = "", "true"
@@ -539,15 +553,6 @@ def _parse_m_classdef(
                     node.ancestors.append(declation_item.content)
                 elif declation_item.token == "punctuation.definition.comment.matlab":
                     _line_comment_to_docstring(class_item, docstring)
-
-        elif class_item.token == "comment.block.percentage.matlab":
-            append_block_comment(class_item, docstring)
-
-        elif class_item.token == "comment.line.percentage.matlab":
-            append_comment(class_item, docstring)
-
-        elif class_item.token == "comment.line.double-percentage.matlab":
-            append_section_comment(class_item, docstring)
 
         elif class_item.token == "meta.properties.matlab":
             modifiers = {}
@@ -655,6 +660,14 @@ def _parse_m_classdef(
             for method_elem, _ in class_item.find("meta.function.matlab", depth=1):
                 method = _parse_method(node, method_elem, attributes)  # type: ignore
                 node.methods[method.name] = method
+
+    for class_item, _ in element.find(_COMMENT_TOKENS, stop_tokens=_CLASS_TOKENS, depth=1):
+        if class_item.token == "comment.block.percentage.matlab":
+            append_block_comment(class_item, docstring)
+        elif class_item.token == "comment.line.percentage.matlab":
+            append_comment(class_item, docstring)
+        elif class_item.token == "comment.line.double-percentage.matlab":
+            append_section_comment(class_item, docstring)
 
     node.docstring = fix_indentation(docstring)
     return node
