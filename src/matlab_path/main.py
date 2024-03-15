@@ -13,13 +13,14 @@ class SearchPath:
         _search_path (deque[Path]): A deque of Path objects representing the search path.
         _path_members (dict[Path, list[tuple[str, Path]]]): A dictionary mapping each path to a list of tuples containing the name and member Path objects.
         _namespace (dict[str, deque[Path]]): A dictionary mapping each name to a deque of member Path objects.
+        _local_namespaces (dict[Path, dict[str, Path]]): A dictionary mapping each path to a dictionary of local names to member Path objects.
         _database (dict[Path, Node]): A dictionary mapping each member Path object to its corresponding Node object.
 
     """
 
     def __init__(self, matlab_path: list[str | Path]) -> None:
         """
-        Initialize an instance of MyClass.
+        Initialize an instance of SearchPath.
 
         Args:
             matlab_path (list[str | Path]): A list of strings or Path objects representing the MATLAB paths.

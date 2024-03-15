@@ -124,16 +124,18 @@ def _parse_dir_classdef(path: Path, parent: Node | None = None) -> Classdef | No
     class_definition = path / f"{path.stem[1:]}.m"
 
     if not class_definition.exists():
-        return None
+        element = TM_PARSER.parse_file(class_definition)
+        if element is None:
+            return None
 
-    element = TM_PARSER.parse_file(class_definition)
-    if element is None:
-        return None
-
-    class_elem = next(element.find("meta.class.matlab", depth=1))[0]
-    node = _parse_m_classdef(class_definition, class_elem, parent)  # type: ignore
+        class_elem = next(element.find("meta.class.matlab", depth=1))[0]
+        node = _parse_m_classdef(class_definition, class_elem, parent)  # type: ignore
+    else:
+        fqdm = _fully_qualified_domain_name(path.stem[1:], parent)
+        node = Classdef(name=path.stem[1:], fqdm=fqdm, path=path, parent=parent)
 
     for member in path.iterdir():
+        # TODO Private folders?
         if member.is_file() and member != class_definition:
             if member.name == "Contents.m":
                 continue
