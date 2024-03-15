@@ -1,4 +1,9 @@
+from __future__ import annotations
+
 from textmate_grammar.elements import ContentElement
+
+from . import TM_PARSER
+from .nodes import Script
 
 
 def append_comment(elem: ContentElement, docstring: dict[int, str]) -> dict[int, str]:
@@ -77,3 +82,51 @@ def fix_indentation(docstring: dict[int, str]) -> dict[int, str]:
     for (i, line), pad in zip(docstring.items(), padding):
         docstring[i] = line[indent:].rstrip() if len(line) >= pad else line.rstrip()
     return docstring
+
+
+def analyze_dependency(element: ContentElement, node: Script):
+    """
+    Analyzes the dependency of a given element and updates the dependencies of a script node.
+
+    Args:
+        element (ContentElement): The element to analyze the dependency for.
+        node (Script): The script node to update the dependencies for.
+
+    Returns:
+        None
+    """
+
+    # TODO account for imports of packages
+
+    local_variables: set[str] = set()
+
+    for item, _ in element.find(
+        [
+            "variable.parameter.input.matlab",
+            "meta.assignment.variable.single.matlab" "meta.assignment.variable.group.matlab",
+            "storage.type.matlab",
+        ]
+    ):
+        if item.token == "variable.parameter.input.matlab":
+            local_variables.add(item.content)
+        elif item.token == "meta.assignment.variable.single.matlab":
+            local_variables.add(next(item.find("variable.other.readwrite.matlab"))[0].content)
+        elif item.token == "meta.assignment.variable.group.matlab":
+            for variable, _ in item.find("variable.other.readwrite.matlab"):
+                local_variables.add(variable.content)
+        elif item.token == "storage.type.matlab":
+            node._calls.add(item.content)
+
+    token_list = element.flatten()
+    for i, (_, content, tokens) in enumerate(token_list):
+        if len(tokens) > 2 and tokens[-2:] == [
+            "meta.function-call.parens.matlab",
+            "entity.name.function.matlab",
+        ]:
+            prev_index = i - 1
+            if token_list[prev_index][2][-1] != "punctuation.accessor.dot.matlab":
+                node._calls.add(content)
+
+    for name in local_variables:
+        if name in node._calls:
+            node._calls.remove(name)

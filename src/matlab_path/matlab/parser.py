@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import logging
 from pathlib import Path
-from typing import Callable
 
 from textmate_grammar.elements import ContentBlockElement, ContentElement
-from textmate_grammar.grammars import matlab
-from textmate_grammar.language import LanguageParser
-from textmate_grammar.utils import cache
 
+from . import TM_PARSER
 from .attributes import ArgumentAttributes, ClassdefAttributes, MethodAttributes, PropertyAttributes
 from .nodes import (
     App,
@@ -24,12 +20,14 @@ from .nodes import (
     Property,
     Script,
 )
-from .utils import append_block_comment, append_comment, append_section_comment, fix_indentation
+from .utils import (
+    analyze_dependency,
+    append_block_comment,
+    append_comment,
+    append_section_comment,
+    fix_indentation,
+)
 
-logging.getLogger("textmate_grammar").setLevel(logging.ERROR)
-cache.init_cache("shelve")
-
-TM_PARSER = LanguageParser(matlab.GRAMMAR)
 _COMMENT_TOKENS = [
     "comment.line.percentage.matlab",
     "comment.block.percentage.matlab",
@@ -43,7 +41,10 @@ _STOP_TOKENS = [
 
 
 def get_node(
-    path: Path, parent: Node | None = None, in_class_folder: bool = False
+    path: Path,
+    parent: Node | None = None,
+    in_class_folder: bool = False,
+    dependency_analysis: bool = False,
 ) -> Script | None:
     """
     Returns a Node object based on the given path.
@@ -71,7 +72,7 @@ def get_node(
                 return None
             try:
                 class_elem = next(element.find("meta.class.matlab", depth=1))[0]
-                return _parse_m_classdef(path, class_elem, parent)  # type: ignore
+                node = _parse_m_classdef(path, class_elem, parent)  # type: ignore
             except StopIteration:
                 generator = element.find(
                     [
@@ -85,9 +86,15 @@ def get_node(
                 )
                 for item, _ in generator:
                     if item.token == "meta.function.matlab":
-                        return _parse_m_function(path, item, parent, in_class_folder)  # type: ignore
+                        node = _parse_m_function(path, item, parent, in_class_folder)  # type: ignore
+                        break
                 else:
-                    return _parse_m_script(path, element, parent)  # type: ignore
+                    node = _parse_m_script(path, element, parent)  # type: ignore
+
+            if node is not None and dependency_analysis:
+                analyze_dependency(element, node)
+
+            return node
 
         elif path.suffix == ".p":
             # TODO get docstring from .m helper path
@@ -123,7 +130,7 @@ def _parse_dir_classdef(path: Path, parent: Node | None = None) -> Classdef | No
     """
     class_definition = path / f"{path.stem[1:]}.m"
 
-    if not class_definition.exists():
+    if class_definition.exists():
         element = TM_PARSER.parse_file(class_definition)
         if element is None:
             return None

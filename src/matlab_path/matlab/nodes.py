@@ -7,7 +7,7 @@ from pathlib import Path
 from .attributes import ArgumentAttributes, ClassdefAttributes, MethodAttributes, PropertyAttributes
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Node:
     """
     Represents a node in the MATLAB path.
@@ -22,11 +22,18 @@ class Node:
     path: Path
     parent: Node | None = None
 
+    _calls: set[str] = field(default_factory=set)
+    dependencies: set[Node] = field(default_factory=set)
+    dependants: set[Node] = field(default_factory=set)
+
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name}: path={self.path})"
 
+    def __hash__(self) -> int:
+        return hash(self.path)
 
-@dataclass(repr=False)
+
+@dataclass(repr=False, eq=False)
 class Script(Node):
     """
     Represents a MATLAB script.
@@ -40,7 +47,7 @@ class Script(Node):
     docstring: dict[int, str] = field(default_factory=dict)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Property(Node):
     """
     Represents a property in a MATLAB class.
@@ -62,7 +69,7 @@ class Property(Node):
     docstring: dict[int, str] = field(default_factory=dict)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Argument(Node):
     """
     Represents an argument in a MATLAB function or method.
@@ -84,7 +91,7 @@ class Argument(Node):
     docstring: dict[int, str] = field(default_factory=dict)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Enum(Node):
     """
     Represents an enumeration node.
@@ -98,7 +105,7 @@ class Enum(Node):
     docstring: dict[int, str] = field(default_factory=dict)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Function(Script):
     """
     Represents a function in MATLAB.
@@ -114,7 +121,7 @@ class Function(Script):
     options: dict[str, Argument] = field(default_factory=dict)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Method(Function):
     """
     Represents a method in MATLAB.
@@ -125,7 +132,7 @@ class Method(Function):
     attributes: MethodAttributes = field(default_factory=MethodAttributes)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Classdef(Script):
     """
     Represents a MATLAB class definition.
@@ -147,7 +154,7 @@ class Classdef(Script):
     attributes: ClassdefAttributes = field(default_factory=ClassdefAttributes)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Package(Script):
     """
     Represents a MATLAB package.
@@ -163,7 +170,7 @@ class Package(Script):
     packages: list[Package] = field(default_factory=list)
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class LiveScript(Script):
     """
     Represents a live script in MATLAB.
@@ -172,7 +179,7 @@ class LiveScript(Script):
     ...
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class App(Script):
     """
     Represents a MATLAB application in the MATLAB path.
@@ -181,7 +188,7 @@ class App(Script):
     ...
 
 
-@dataclass(repr=False)
+@dataclass(repr=False, eq=False)
 class Mex(Script):
     """
     Represents a MATLAB MEX file.

@@ -10,7 +10,7 @@ path = current_path / "workspace"
 
 search_path = SearchPath([])
 search_path.addpath(path, recursive=True)
-
+search_path.resolve_dependencies()
 #%%
 
 f0 = search_path.resolve('function0')
@@ -20,3 +20,5 @@ p2 = search_path.resolve('package2')
 p3 = search_path.resolve('package2.package3')
 lf = search_path.resolve('privatefunction', local_namespaces=[p2.path.parent])
 # %%
+
+

@@ -1,7 +1,7 @@
 from collections import defaultdict, deque
 from pathlib import Path
 
-from .matlab.nodes import Node, Package
+from .matlab.nodes import Node, Package, Script
 from .matlab.parser import get_node
 
 
@@ -18,7 +18,7 @@ class SearchPath:
 
     """
 
-    def __init__(self, matlab_path: list[str | Path]) -> None:
+    def __init__(self, matlab_path: list[str | Path], dependency_analysis: bool = False) -> None:
         """
         Initialize an instance of SearchPath.
 
@@ -38,6 +38,7 @@ class SearchPath:
         self._namespace: dict[str, deque[Path]] = defaultdict(deque)
         self._local_namespaces: dict[Path, dict[str, Path]] = defaultdict(dict)
         self._database: dict[Path, Node] = {}
+        self._dependency_analysis = dependency_analysis
 
         for path in matlab_path:
             self.addpath(Path(path), to_end=True)
@@ -96,7 +97,7 @@ class SearchPath:
                 # ignore contents.m files except in package/class folders
                 continue
 
-            node = get_node(member)
+            node = get_node(member, dependency_analysis=self._dependency_analysis)
             if node is None:
                 continue
             self._path_members[path].append((node.fqdm, member))
@@ -163,6 +164,32 @@ class SearchPath:
         if recursive:
             for subdir in [item for item in self._search_path if _is_subdirectory(path, item)]:
                 self.rm_path(subdir, recursive=False)
+
+    def resolve_dependencies(self) -> None:
+        """
+        Resolves the dependencies for each node in the database.
+
+        This method iterates over each node in the database and resolves its dependencies.
+        It updates the dependencies of each node by removing any dependencies that could not be resolved.
+        It also updates the dependants of each resolved dependency.
+
+        Returns:
+            None
+        """
+
+        # TODO how to handle unresolved dependencies?
+
+        for node in self._database.values():
+            if not isinstance(node, Script):
+                continue
+            resolved_dependencies = [
+                self.resolve(name, local_namespaces=[node.path.parent]) for name in node._calls
+            ]
+            node.dependencies = {
+                dependency for dependency in resolved_dependencies if dependency is not None
+            }
+            for dependency in node.dependencies:
+                dependency.dependants.add(node)
 
 
 def _is_subdirectory(parent_path: Path, child_path: Path) -> bool:

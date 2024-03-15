@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "MATLAB search path resolver"
+name = "matlab-search-path-resolver"
 version = "0.1.0"
 description = "Navigate the MATLAB search path in Python."
 authors = ["Mark Hu <watermarkhu@gmail.com>"]
