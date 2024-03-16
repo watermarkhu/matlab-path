@@ -22,10 +22,6 @@ class Node:
     path: Path
     parent: Node | None = None
 
-    _calls: set[str] = field(default_factory=set)
-    dependencies: set[Node] = field(default_factory=set)
-    dependants: set[Node] = field(default_factory=set)
-
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name}: path={self.path})"
 
@@ -45,6 +41,12 @@ class Script(Node):
 
     fqdm: str = ""
     docstring: dict[int, str] = field(default_factory=dict)
+
+    _imports: set[str] = field(default_factory=set)
+    _calls: set[str] = field(default_factory=set)
+    _builtin_dependencies: set[str] = field(default_factory=set)
+    dependencies: set[Script] = field(default_factory=set)
+    dependants: set[Script] = field(default_factory=set)
 
 
 @dataclass(repr=False, eq=False)

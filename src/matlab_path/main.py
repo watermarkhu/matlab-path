@@ -37,13 +37,13 @@ class SearchPath:
         self._path_members: dict[Path, list[tuple[str, Path]]] = defaultdict(list)
         self._namespace: dict[str, deque[Path]] = defaultdict(deque)
         self._local_namespaces: dict[Path, dict[str, Path]] = defaultdict(dict)
-        self._database: dict[Path, Node] = {}
+        self._database: dict[Path, Script] = {}
         self._dependency_analysis = dependency_analysis
 
         for path in matlab_path:
             self.addpath(Path(path), to_end=True)
 
-    def resolve(self, name: str, local_namespaces: list[str | Path] | None = None) -> Node | None:
+    def resolve(self, name: str, local_namespaces: list[Path] | None = None) -> Script | None:
         """
         Resolves the given name to a Node object.
 
@@ -182,8 +182,17 @@ class SearchPath:
         for node in self._database.values():
             if not isinstance(node, Script):
                 continue
+
+            # Get paths of imported namespaces
+            packages = [
+                self.resolve(pkg, local_namespaces=[node.path.parent]) for pkg in node._imports
+            ]
+            package_paths = [pkg.path for pkg in packages if pkg is not None]
+
+            # Try to resolve all dependencies
             resolved_dependencies = [
-                self.resolve(name, local_namespaces=[node.path.parent]) for name in node._calls
+                self.resolve(name, local_namespaces=[node.path.parent] + package_paths)
+                for name in node._calls
             ]
             node.dependencies = {
                 dependency for dependency in resolved_dependencies if dependency is not None

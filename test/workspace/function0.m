@@ -12,6 +12,10 @@ function ret = function0(arg1, arg2):
         arg1 (1,1) double {mustBeNumeric, mustBePositive} = 1
         arg2 (1,1) double {mustBeNumeric, mustBePositive} = function2(arg1)
     end
+    import package1.function22
+    import package2.*
+    import package2.package3.*
+    %#function num2str linspace
 
     function1(arg1, arg2);
     arg3 = function2;
