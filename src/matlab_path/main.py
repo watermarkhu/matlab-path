@@ -188,15 +188,24 @@ class SearchPath:
                 self.resolve(pkg, local_namespaces=[node.path.parent]) for pkg in node._imports
             ]
             package_paths = [pkg.path for pkg in packages if pkg is not None]
+            package_paths.reverse()
 
             # Try to resolve all dependencies
-            resolved_dependencies = [
-                self.resolve(name, local_namespaces=[node.path.parent] + package_paths)
-                for name in node._calls
-            ]
-            node.dependencies = {
-                dependency for dependency in resolved_dependencies if dependency is not None
-            }
+            namespace = package_paths + [node.path.parent]
+            for name in node._calls:
+                dependency = self.resolve(name, local_namespaces=namespace)
+                if dependency is None:
+                    if "." in name:
+                        # classdef method
+                        dependency = self.resolve(
+                            name.split(".")[0], local_namespaces=package_paths
+                        )
+                        if dependency is None:
+                            continue
+                    else:
+                        continue
+                node.dependencies.add(dependency)
+
             for dependency in node.dependencies:
                 dependency.dependants.add(node)
 

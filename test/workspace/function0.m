@@ -20,6 +20,17 @@ function ret = function0(arg1, arg2):
     function1(arg1, arg2);
     arg3 = function2;
     function3
-    [arg4, arg5] = function4(arg1);
+    [arg4, arg5] = function01(arg1);
+
+    unknown_function(arg1, arg2, arg3);
+
+    variable = arg1;
+    value = function_direct_call;
+    script_direct_call;
+
+    package1.function22(arg1, arg2, arg3);
+
+    class4.calculateArea(0, 1, 2);
+
     ret = arg1.class.list(0) + arg2 + arg3;
 end

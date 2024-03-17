@@ -113,11 +113,12 @@ def analyze_dependency(element: ContentElement, node: Script):
     for item, _ in element.find(
         [
             "variable.parameter.input.matlab",
-            "meta.assignment.variable.single.matlab",
-            "meta.assignment.variable.group.matlab",
             "storage.type.matlab",
             "comment.line.percentage.matlab",
             "entity.name.namespace.matlab",
+            "meta.assignment.variable.single.matlab",
+            "meta.assignment.variable.group.matlab",
+            "variable.other.readwrite.matlab",
         ]
     ):
         if item.token == "variable.parameter.input.matlab":
@@ -147,18 +148,34 @@ def analyze_dependency(element: ContentElement, node: Script):
                     node._imports.add(namespace)
             else:
                 add_dependency("".join([child.content for child in item.children]))
+        elif (
+            item.token == "variable.other.readwrite.matlab"
+            and item.content not in local_variables
+            and (
+                item.parent is not None
+                and item.parent.token
+                not in [
+                    "meta.assignment.variable.single.matlab",
+                    "meta.assignment.variable.group.matlab",
+                ]
+            )
+        ):
+            add_dependency(item.content)
 
     token_list = element.flatten()
     for i, (_, content, tokens) in enumerate(token_list):
-        # TODO also add variable.other.readwrite.matlab that has no = after it
         if len(tokens) > 2 and tokens[-2:] == [
             "meta.function-call.parens.matlab",
             "entity.name.function.matlab",
         ]:
-            prev_index = i - 1
-            if token_list[prev_index][2][-1] != "punctuation.accessor.dot.matlab":
-                # TODO resolve for full call also
+            if i > 1 and token_list[i - 1][2][-1] != "punctuation.accessor.dot.matlab":
                 add_dependency(content)
+            else:
+                name = content
+                while i > 1 and token_list[i - 1][2][-1] == "punctuation.accessor.dot.matlab":
+                    name = token_list[i - 2][1] + "." + name
+                    i -= 2
+                add_dependency(name)
 
     for name in local_variables:
         if name in node._calls:
