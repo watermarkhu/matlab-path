@@ -173,9 +173,11 @@ def analyze_dependency(element: ContentElement, node: Script):
             else:
                 name = content
                 while i > 1 and token_list[i - 1][2][-1] == "punctuation.accessor.dot.matlab":
-                    name = token_list[i - 2][1] + "." + name
+                    namespace_item = token_list[i - 2][1]
+                    name = namespace_item + "." + name
                     i -= 2
-                add_dependency(name)
+                if namespace_item not in local_variables:
+                    add_dependency(name)
 
     for name in local_variables:
         if name in node._calls:

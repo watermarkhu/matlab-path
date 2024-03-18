@@ -194,17 +194,13 @@ class SearchPath:
             namespace = package_paths + [node.path.parent]
             for name in node._calls:
                 dependency = self.resolve(name, local_namespaces=namespace)
+                if dependency is None and "." in name:
+                    # classdef method
+                    dependency = self.resolve(name.split(".")[0], local_namespaces=package_paths)
                 if dependency is None:
-                    if "." in name:
-                        # classdef method
-                        dependency = self.resolve(
-                            name.split(".")[0], local_namespaces=package_paths
-                        )
-                        if dependency is None:
-                            continue
-                    else:
-                        continue
-                node.dependencies.add(dependency)
+                    node._unresolved_dependencies.add(name)
+                else:
+                    node.dependencies.add(dependency)
 
             for dependency in node.dependencies:
                 dependency.dependants.add(node)

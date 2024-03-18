@@ -45,6 +45,7 @@ class Script(Node):
     _imports: set[str] = field(default_factory=set)
     _calls: set[str] = field(default_factory=set)
     _builtin_dependencies: set[str] = field(default_factory=set)
+    _unresolved_dependencies: set[str] = field(default_factory=set)
     dependencies: set[Script] = field(default_factory=set)
     dependants: set[Script] = field(default_factory=set)
 
