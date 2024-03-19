@@ -71,8 +71,8 @@ def get_node(
             if element is None:
                 return None
             try:
-                class_elem = next(element.find("meta.class.matlab", depth=1))[0]
-                node = _parse_m_classdef(path, class_elem, parent)  # type: ignore
+                element = next(element.find("meta.class.matlab", depth=1))[0]
+                node = _parse_m_classdef(path, element, parent)  # type: ignore
             except StopIteration:
                 generator = element.find(
                     [

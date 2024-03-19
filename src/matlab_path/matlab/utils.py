@@ -4,7 +4,7 @@ from textmate_grammar.elements import ContentElement
 
 from . import TM_PARSER
 from .data import _load_references
-from .nodes import Script
+from .nodes import Classdef, Script
 
 
 def append_comment(elem: ContentElement, docstring: dict[int, str]) -> dict[int, str]:
@@ -85,7 +85,7 @@ def fix_indentation(docstring: dict[int, str]) -> dict[int, str]:
     return docstring
 
 
-def analyze_dependency(element: ContentElement, node: Script):
+def analyze_dependency(element: ContentElement, node: Script) -> None:
     """
     Analyzes the dependency of a given element and updates the dependencies of a script node.
 
@@ -100,6 +100,40 @@ def analyze_dependency(element: ContentElement, node: Script):
     """
     # TODO for classdef separate analysis of methods
 
+    if isinstance(node, Classdef):
+        builtins = _load_references()
+
+        for ancestor in node.ancestors:
+            if ancestor in builtins:
+                node._builtin_dependencies.add(ancestor)
+            else:
+                node._calls.add(ancestor)
+
+        for class_elem, _ in element.find(
+            ["meta.properties.matlab", "meta.methods.matlab"],
+            depth=1,
+        ):
+            if class_elem.token == "meta.properties.matlab":
+                for item, _ in class_elem.find(
+                    [
+                        "storage.type.matlab",
+                        "entity.name.function.matlab",
+                        "variable.other.readwrite.matlab",
+                    ]
+                ):
+                    if item.content in builtins:
+                        node._builtin_dependencies.add(item.content)
+                    else:
+                        node._calls.add(item.content)
+            elif class_elem.token == "meta.methods.matlab":
+                for method_elem, _ in class_elem.find("meta.function.matlab", depth=1):
+                    fname = next(method_elem.find("entity.name.function.matlab"))[0].content
+                    _analyze_dependency_function(method_elem, node.methods[fname])
+    else:
+        _analyze_dependency_function(element, node)
+
+
+def _analyze_dependency_function(element: ContentElement, node: Script) -> None:
     builtins = _load_references()
 
     def add_dependency(name: str):
