@@ -1,7 +1,7 @@
 from collections import defaultdict, deque
 from pathlib import Path
 
-from .matlab.nodes import Node, Package, Script
+from .matlab.nodes import Classdef, Package, Script
 from .matlab.parser import get_node
 
 
@@ -176,34 +176,35 @@ class SearchPath:
         Returns:
             None
         """
-
-        # TODO how to handle unresolved dependencies?
-
         for node in self._database.values():
             if not isinstance(node, Script):
                 continue
+            self._resolve_node(node)
 
-            # Get paths of imported namespaces
-            packages = [
-                self.resolve(pkg, local_namespaces=[node.path.parent]) for pkg in node._imports
-            ]
-            package_paths = [pkg.path for pkg in packages if pkg is not None]
-            package_paths.reverse()
+    def _resolve_node(self, node):
+        # Get paths of imported namespaces
+        packages = [self.resolve(pkg, local_namespaces=[node.path.parent]) for pkg in node._imports]
+        package_paths = [pkg.path for pkg in packages if pkg is not None]
+        package_paths.reverse()
 
-            # Try to resolve all dependencies
-            namespace = package_paths + [node.path.parent]
-            for name in node._calls:
-                dependency = self.resolve(name, local_namespaces=namespace)
-                if dependency is None and "." in name:
-                    # classdef method
-                    dependency = self.resolve(name.split(".")[0], local_namespaces=package_paths)
-                if dependency is None:
-                    node._unresolved_dependencies.add(name)
-                else:
-                    node.dependencies.add(dependency)
+        # Try to resolve all dependencies
+        namespace = package_paths + [node.path.parent]
+        for name in node._calls:
+            dependency = self.resolve(name, local_namespaces=namespace)
+            if dependency is None and "." in name:
+                # classdef method
+                dependency = self.resolve(name.split(".")[0], local_namespaces=package_paths)
+            if dependency is None:
+                node._unresolved_dependencies.add(name)
+            else:
+                node.dependencies.add(dependency)
 
-            for dependency in node.dependencies:
-                dependency.dependants.add(node)
+        for dependency in node.dependencies:
+            dependency.dependants.add(node)
+
+        if isinstance(node, Classdef):
+            for method in node.methods.values():
+                self._resolve_node(method)
 
 
 def _is_subdirectory(parent_path: Path, child_path: Path) -> bool:

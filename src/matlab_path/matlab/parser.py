@@ -37,6 +37,8 @@ _STOP_TOKENS = [
     "meta.function.matlab",  # Nested functions
     "meta.function-call.parens.matlab",  # Function call
     "meta.assignment.variable.single.matlab",  # Assignment
+    "meta.assignment.variable.group.matlab",
+    "meta.import.matlab",  # Import
 ]
 
 

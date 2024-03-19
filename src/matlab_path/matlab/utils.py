@@ -98,8 +98,6 @@ def analyze_dependency(element: ContentElement, node: Script) -> None:
     Returns:
         None
     """
-    # TODO for classdef separate analysis of methods
-
     if isinstance(node, Classdef):
         builtins = _load_references()
 
