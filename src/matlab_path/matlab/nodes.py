@@ -24,7 +24,7 @@ class Node:
 
     @property
     def nodetype(self) -> str:
-        return self.__class__.__name__ 
+        return self.__class__.__name__
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.name}: path={self.path})"
