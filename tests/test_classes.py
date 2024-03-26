@@ -21,7 +21,7 @@ def test_class_resolve(workspace: SearchPath):
     for class_name in target_class_names:
         target_class = workspace.resolve(class_name)
         assert target_class is not None
-        assert target_class.name == class_name
+        assert target_class.fqdm == class_name
         assert target_class.nodetype == "Classdef"
 
 
@@ -35,11 +35,11 @@ def test_class_folder_resolve(workspace: SearchPath):
     for class_name in target_class_names:
         target_class = workspace.resolve(class_name)
         assert target_class is not None
-        assert target_class.name == class_name
+        assert target_class.fqdm == class_name
         assert target_class.nodetype == "Classdef"
 
 def test_class_methods(workspace: SearchPath):
-    target_class = [ 
+    target_class_names = [ 
         "class0", 
         "package1.class6"
     ]
@@ -49,7 +49,7 @@ def test_class_methods(workspace: SearchPath):
         "class0" : [
             "class0",
             "my_method_0",
-            "my_method_1"
+            "my_method_2"
         ],
 
         "package1.class6" : [
@@ -58,6 +58,17 @@ def test_class_methods(workspace: SearchPath):
             "another_method_1"            
         ]
     }
+
+    # check that each class has methods in target_methods
+    for class_name in target_class_names:
+        target_class = workspace.resolve(class_name)
+        assert target_methods[class_name] == list(target_class.methods.keys())
+
+
+
+
+#     for class_name in target_class_names:
+#         target_class = 
 
 
 # def test_class_properties(workspace: SearchPath):
