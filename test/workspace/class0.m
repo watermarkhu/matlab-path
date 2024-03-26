@@ -8,5 +8,13 @@ classdef class0 < matlab.unittest.TestCase & char
         function obj = class0(inputArg1)
             obj = function0(inputArg1);
         end
+
+        function obj = my_method_0(obj, arg1)
+
+        end
+
+        function obj = my_method_2(obj, arg1)
+
+        end        
     end
 end
