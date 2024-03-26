@@ -20,4 +20,4 @@ def test_wrong_class_folders(workspace: SearchPath):
     badclass = workspace.resolve("badclass")
     
     assert badclass is not None
-    assert list(badclass.methods.keys()) == ['method1']
+    assert list(badclass.methods.keys()) == ['method1'] # type: ignore

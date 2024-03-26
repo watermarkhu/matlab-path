@@ -62,7 +62,7 @@ def test_class_methods(workspace: SearchPath):
     # check that each class has methods in target_methods
     for class_name in target_class_names:
         target_class = workspace.resolve(class_name)
-        assert target_methods[class_name] == list(target_class.methods.keys())
+        assert target_methods[class_name] == list(target_class.methods.keys())  # type: ignore
 
 
 
