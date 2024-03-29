@@ -1,38 +1,38 @@
-[tool.poetry]
+[project]
 name = "matlab-search-path-resolver"
 version = "0.1.0"
 description = "Navigate the MATLAB search path in Python."
-authors = ["Mark Hu <watermarkhu@gmail.com>"]
-license = "MIT"
+authors = [
+    { name = "Mark Hu", email = "watermarkhu@gmail.com" }
+]
+dependencies = [
+    "textmate-grammar-python @ file:///home/watermarkhu/sphinx/temp/../textmate-grammar-python",
+    "pre-commit>=3.7.0",
+]
 readme = "README.md"
-repository = "https://github.com/watermarkhu/matlab-path"
-documentation = "https://"
-keywords = ["MATLAB", "path", "textmate"]
-packages = [{include = "matlab_path", from = "src"}]
+requires-python = ">= 3.9"
+license = "MIT"
 
-[tool.poetry.dependencies]
-python = "^3.11"
-textmate-grammar-python = { path = "../textmate-grammar-python/", develop = true }
 
-[tool.poetry.group.test.dependencies]
-pytest = ">=7.3.1,<9.0.0"
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry.group.dev.dependencies]
-poetry-bumpversion = "^0.3.2"
-pre-commit = "^3.6.0"
-mypy = "^1.8.0"
-ruff = "^0.3.0"
-tox = "^4.14.1"
-selenium = "^4.18.1"
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "pytest>=7.3.1",
+    "pre-commit>=3.6.0",
+    "tox>=4.14.1",
+    "selenium>=4.18.1",
+]
 
-[tool.poetry.group.doc.dependencies]
-sphinx = "^7.2.6"
-sphinx-autodoc2 = "^0.5.0"
-myst-parser = "^2.0.0"
-furo = "^2024.1.29"
-sphinxcontrib-mermaid = "^0.9.2"
+[tool.hatch.metadata]
+allow-direct-references = true
 
-[tool.poetry_bumpversion.file."src/matlab_path/__init__.py"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/temp"]
+
 
 [tool.ruff]
 include = ["pyproject.toml", "src/matlab_path/**/*.py"]
@@ -54,7 +54,3 @@ docstring-code-line-length = "dynamic"
 [tool.mypy]
 ignore_missing_imports = true
 exclude = ["test/*", "docs/*", "example.py"]
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
