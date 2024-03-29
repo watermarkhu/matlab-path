@@ -31,7 +31,7 @@ dev-dependencies = [
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/temp"]
+packages = ["src/matlab_path"]
 
 
 [tool.ruff]
