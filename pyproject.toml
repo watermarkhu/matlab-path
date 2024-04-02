@@ -6,7 +6,7 @@ authors = [
     { name = "Mark Hu", email = "watermarkhu@gmail.com" }
 ]
 dependencies = [
-    "textmate-grammar-python @ file:///home/watermarkhu/sphinx/temp/../textmate-grammar-python",
+    "textmate-grammar-python>=0.4.0",
     "pre-commit>=3.7.0",
 ]
 readme = "README.md"

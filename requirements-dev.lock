@@ -25,6 +25,10 @@ colorama==0.4.6
     # via tox
 distlib==0.3.8
     # via virtualenv
+exceptiongroup==1.2.0
+    # via pytest
+    # via trio
+    # via trio-websocket
 filelock==3.13.3
     # via tox
     # via virtualenv
@@ -71,8 +75,12 @@ sniffio==1.3.1
     # via trio
 sortedcontainers==2.4.0
     # via trio
-textmate-grammar-python @ file:///home/watermarkhu/sphinx/temp/../textmate-grammar-python
+textmate-grammar-python==0.4.0
     # via matlab-search-path-resolver
+tomli==2.0.1
+    # via pyproject-api
+    # via pytest
+    # via tox
 tox==4.14.2
 trio==0.25.0
     # via selenium
