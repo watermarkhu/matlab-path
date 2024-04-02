@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 
 
@@ -9,18 +11,17 @@ class Attributes:
                 settings[key] = True
                 continue
             annotation = cls.__annotations__.get(key, bool)
-            match annotation.__qualname__:
-                case "bool":
-                    if value in ["True", "true", "t", 1]:
-                        settings[key] = True
-                    else:
-                        settings[key] = False
-                case "int":
-                    settings[key] = int(value)
-                case "list[str]":
-                    raise NotImplementedError
-                case _:
-                    raise NotImplementedError
+            if annotation == "bool":
+                if value in ["True", "true", "t", 1]:
+                    settings[key] = True
+                else:
+                    settings[key] = False
+            elif annotation == "int":
+                settings[key] = int(value)
+            elif annotation == "list[str]":
+                raise NotImplementedError
+            else:
+                raise NotImplementedError
         return cls(**settings)
 
 

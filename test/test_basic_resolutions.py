@@ -1,34 +1,23 @@
-from pathlib import Path
-
 import pytest
 from matlab_path import SearchPath
+from matlab_path.matlab import nodes as n
+
+workspace_mapping = {
+    "function0"     : n.Function,
+    "script0"       : n.Script, 
+    "class0"        : n.Classdef,
+    "class1"        : n.Classdef,
+    "package1"      : n.Package
+}
 
 
-@pytest.fixture
-def workspace():
-    current_path = Path(__file__).parent
-    path = current_path / "workspace"
-    search_path = SearchPath([], dependency_analysis=True)
-    search_path.addpath(path, recursive=True)
-    search_path.resolve_dependencies()
-    return search_path
-
-def test_basic_resolve(workspace: SearchPath):
+@pytest.mark.parametrize("name,nodetype", workspace_mapping.items())
+def test_basic_resolve(workspace: SearchPath, name: str, nodetype: n.Node):
     # Check name and nodetype
-    workspace_mapping = {
-        "function0"     : "Function",
-        "script0"       : "Script", 
-        "class0"        : "Classdef",
-        "class1"        : "Classdef",
-        "package1"      : "Package"
-    }
-
-    for k, v in workspace_mapping.items():
-        print(f"Verifying \'{k}\' ..")
-        item = workspace.resolve(k)
-        assert item is not None
-        assert item.name == k
-        assert item.nodetype == v
+    item = workspace.resolve(name)
+    assert item is not None
+    assert item.name == name
+    assert isinstance(item, nodetype)
 
 
 

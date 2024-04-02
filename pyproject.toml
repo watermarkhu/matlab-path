@@ -25,6 +25,7 @@ dev-dependencies = [
     "pre-commit>=3.6.0",
     "tox>=4.14.1",
     "selenium>=4.18.1",
+    "ipykernel>=6.29.4",
 ]
 
 [tool.hatch.metadata]
