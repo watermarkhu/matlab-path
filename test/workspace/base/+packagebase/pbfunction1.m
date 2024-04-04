@@ -1,4 +1,4 @@
-function output = function00(input)
+function output = pbfunction1(input)
     % This is a dummy function that simply returns the input value
     
     output = input;

@@ -3,9 +3,9 @@ from matlab_path import SearchPath
 
 def test_class_resolve(workspace: SearchPath):
     target_class_names = [ 
-        "class0",
-        "package2.class00",
-        "package2.package3.class00"
+        "myclass",
+        "packagebase.pbclass",
+        "packagebase.subpackagebase.pbsclass"
     ]
 
     for class_name in target_class_names:
@@ -17,9 +17,9 @@ def test_class_resolve(workspace: SearchPath):
 
 def test_class_folder_resolve(workspace: SearchPath):
     target_class_names = [ 
-        "class1",
-        "package1.class6",
-        "package1.package3.class8"
+        "classfoldercore",
+        "packagecore.pclassfoldercore",
+        "packagecore.subpackagecore.spcclass"
     ]
 
     for class_name in target_class_names:
@@ -30,20 +30,20 @@ def test_class_folder_resolve(workspace: SearchPath):
 
 def test_class_methods(workspace: SearchPath):
     target_class_names = [ 
-        "class0", 
-        "package1.class6"
+        "myclass", 
+        "packagecore.pclassfoldercore"
     ]
 
 
     target_methods = {
-        "class0" : [
-            "class0",
+        "myclass" : [
+            "myclass",
             "my_method_0",
             "my_method_2"
         ],
 
-        "package1.class6" : [
-            "class6",
+        "packagecore.pclassfoldercore" : [
+            "pclassfoldercore",
             "another_method",
             "another_method_1"            
         ]

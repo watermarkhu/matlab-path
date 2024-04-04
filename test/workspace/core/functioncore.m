@@ -1,4 +1,4 @@
-function output = function11(input)
+function output = functioncore(input)
     % This function calculates the sum of the squares of the elements in the input array.
     % It then returns the square root of the sum.
     

@@ -1,0 +1,3 @@
+classdef spcclass
+
+end

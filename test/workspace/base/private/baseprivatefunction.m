@@ -1,4 +1,4 @@
-function output = privatefunction(input)
+function output = baseprivatefunction(input)
     % This is a private function.
     % It takes an input and returns an output.
     

@@ -1,4 +1,4 @@
-classdef class00
+classdef pbsclass
     properties
         brand
         model
@@ -7,7 +7,7 @@ classdef class00
     end
     
     methods
-        function obj = class00(brand, model, color, price)
+        function obj = pbsclass(brand, model, color, price)
             obj.brand = brand;
             obj.model = model;
             obj.color = color;

@@ -1,10 +1,10 @@
-classdef class4
+classdef baseclass1
     properties
         radius
     end
     
     methods
-        function obj = class4(radius)
+        function obj = baseclass1(radius)
             obj.radius = radius;
         end
         

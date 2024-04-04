@@ -1,10 +1,10 @@
-classdef class00
+classdef pbclass
     properties
         a
         b
     end
     methods
-        function obj = class00(a,b)
+        function obj = pbclass(a,b)
             obj.a = a;
             obj.b = b;
         end

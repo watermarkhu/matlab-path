@@ -1,11 +1,11 @@
-classdef class5 < class4
+classdef baseclass2 < baseclass1
     properties
         width
         height
     end
     
     methods
-        function obj = class5(width, height)
+        function obj = baseclass2(width, height)
             obj.width = width;
             obj.height = height;
         end

@@ -1,10 +1,10 @@
-classdef class
+classdef pcclass
     properties
         % Add your properties here
     end
     
     methods
-        function obj = class()
+        function obj = pcclass()
             % Constructor
         end
         

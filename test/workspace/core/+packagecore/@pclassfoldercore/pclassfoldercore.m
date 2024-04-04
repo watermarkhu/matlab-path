@@ -1,10 +1,10 @@
-classdef class6
+classdef pclassfoldercore
     properties
         a
         b
     end
     methods
-        function obj = class6(a,b)
+        function obj = pclassfoldercore(a,b)
             obj.a = a;
             obj.b = b;
         end

@@ -1,4 +1,4 @@
-function output = function3(input)
+function output = basefunction2(input)
     % This function takes an input and performs a random operation on it.
     % Replace this comment with the actual purpose of the function.
 

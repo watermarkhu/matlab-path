@@ -3,11 +3,11 @@ from matlab_path import SearchPath
 from matlab_path.matlab import nodes as n
 
 workspace_mapping = {
-    "function0"     : n.Function,
-    "script0"       : n.Script, 
-    "class0"        : n.Classdef,
-    "class1"        : n.Classdef,
-    "package1"      : n.Package
+    "myfunction"     : n.Function,
+    "myscript"       : n.Script, 
+    "myclass"        : n.Classdef,
+    "classfoldercore": n.Classdef,
+    "packagecore"       : n.Package
 }
 
 
@@ -24,8 +24,8 @@ def test_basic_resolve(workspace: SearchPath, name: str, nodetype: n.Node):
 def test_hierarchy(workspace: SearchPath):
     # Verify hierarchy of packages/classes 
     workspace_mapping = [
-        "package1.package3.package4.class7",
-        "package1.class6",
+        "packagecore.subpackagecore.subsubpackagecore.sspcclass",
+        "packagecore.pclassfoldercore",
     ]
 
     for item_name in workspace_mapping:

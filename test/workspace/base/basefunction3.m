@@ -1,4 +1,4 @@
-function output = function4(input)
+function output = basefunction3(input)
     % This function takes an input and returns a random output.
     
     % Generate a random number between 1 and 10
