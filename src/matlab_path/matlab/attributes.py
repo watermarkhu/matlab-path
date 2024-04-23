@@ -18,6 +18,8 @@ class Attributes:
                     settings[key] = False
             elif annotation == "int":
                 settings[key] = int(value)
+            elif annotation == "str":
+                settings[key] = value
             elif annotation == "list[str]":
                 raise NotImplementedError
             else:

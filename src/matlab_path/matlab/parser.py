@@ -274,7 +274,12 @@ def _common_function_method(
         else:
             if "." in name:
                 node.input.pop(name.split(".")[0], None)
-                argument = node.options[name.split(".")[1]]
+
+                option_name = name.split(".")[1]
+                argument =  Argument(
+                    name=option_name, path=node.path, parent=node
+                )
+                node.options[option_name] = argument
             else:
                 argument = node.input[name]
 
