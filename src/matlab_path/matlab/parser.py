@@ -276,9 +276,7 @@ def _common_function_method(
                 node.input.pop(name.split(".")[0], None)
 
                 option_name = name.split(".")[1]
-                argument =  Argument(
-                    name=option_name, path=node.path, parent=node
-                )
+                argument = Argument(name=option_name, path=node.path, parent=node)
                 node.options[option_name] = argument
             else:
                 argument = node.input[name]
