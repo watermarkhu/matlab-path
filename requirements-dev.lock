@@ -33,21 +33,21 @@ decorator==5.1.1
     # via ipython
 distlib==0.3.8
     # via virtualenv
-exceptiongroup==1.2.0
+exceptiongroup==1.2.1
     # via ipython
     # via pytest
     # via trio
     # via trio-websocket
 executing==2.0.1
     # via stack-data
-filelock==3.13.3
+filelock==3.14.0
     # via tox
     # via virtualenv
 h11==0.14.0
     # via wsproto
-identify==2.5.35
+identify==2.5.36
     # via pre-commit
-idna==3.6
+idna==3.7
     # via trio
 importlib-metadata==7.1.0
     # via jupyter-client
@@ -63,7 +63,7 @@ jupyter-client==8.6.1
 jupyter-core==5.7.2
     # via ipykernel
     # via jupyter-client
-matplotlib-inline==0.1.6
+matplotlib-inline==0.1.7
     # via ipykernel
     # via ipython
 nest-asyncio==1.6.0
@@ -79,15 +79,15 @@ packaging==24.0
     # via pyproject-api
     # via pytest
     # via tox
-parso==0.8.3
+parso==0.8.4
     # via jedi
 pexpect==4.9.0
     # via ipython
-platformdirs==4.2.0
+platformdirs==4.2.1
     # via jupyter-core
     # via tox
     # via virtualenv
-pluggy==1.4.0
+pluggy==1.5.0
     # via pytest
     # via tox
 pre-commit==3.7.0
@@ -100,7 +100,7 @@ ptyprocess==0.7.0
     # via pexpect
 pure-eval==0.2.2
     # via stack-data
-pycparser==2.21
+pycparser==2.22
     # via cffi
 pygments==2.17.2
     # via ipython
@@ -108,17 +108,17 @@ pyproject-api==1.6.1
     # via tox
 pysocks==1.7.1
     # via urllib3
-pytest==8.1.1
+pytest==8.2.0
 python-dateutil==2.9.0.post0
     # via jupyter-client
 pyyaml==6.0.1
     # via pre-commit
     # via textmate-grammar-python
-pyzmq==25.1.2
+pyzmq==26.0.2
     # via ipykernel
     # via jupyter-client
-selenium==4.19.0
-setuptools==69.2.0
+selenium==4.20.0
+setuptools==69.5.1
     # via nodeenv
 six==1.16.0
     # via asttokens
@@ -138,8 +138,8 @@ tomli==2.0.1
 tornado==6.4
     # via ipykernel
     # via jupyter-client
-tox==4.14.2
-traitlets==5.14.2
+tox==4.15.0
+traitlets==5.14.3
     # via comm
     # via ipykernel
     # via ipython
@@ -151,12 +151,12 @@ trio==0.25.0
     # via trio-websocket
 trio-websocket==0.11.1
     # via selenium
-typing-extensions==4.10.0
+typing-extensions==4.11.0
     # via ipython
     # via selenium
 urllib3==2.2.1
     # via selenium
-virtualenv==20.25.1
+virtualenv==20.26.1
     # via pre-commit
     # via tox
 wcwidth==0.2.13

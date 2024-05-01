@@ -14,26 +14,26 @@ cfgv==3.4.0
     # via pre-commit
 distlib==0.3.8
     # via virtualenv
-filelock==3.13.3
+filelock==3.14.0
     # via virtualenv
-identify==2.5.35
+identify==2.5.36
     # via pre-commit
 nodeenv==1.8.0
     # via pre-commit
 onigurumacffi==1.3.0
     # via textmate-grammar-python
-platformdirs==4.2.0
+platformdirs==4.2.1
     # via virtualenv
 pre-commit==3.7.0
     # via matlab-search-path-resolver
-pycparser==2.21
+pycparser==2.22
     # via cffi
 pyyaml==6.0.1
     # via pre-commit
     # via textmate-grammar-python
-setuptools==69.2.0
+setuptools==69.5.1
     # via nodeenv
 textmate-grammar-python==0.4.0
     # via matlab-search-path-resolver
-virtualenv==20.25.1
+virtualenv==20.26.1
     # via pre-commit
