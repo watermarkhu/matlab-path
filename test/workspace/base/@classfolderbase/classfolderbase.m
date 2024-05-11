@@ -1,10 +1,10 @@
-classdef class2
+classdef classfolderbase
     properties
         a
         b
     end
     methods
-        function obj = class2(a,b)
+        function obj = classfolderbase(a,b)
             obj.a = a;
             obj.b = b;
         end

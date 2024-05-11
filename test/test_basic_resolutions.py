@@ -17,7 +17,7 @@ def test_basic_resolve(workspace: SearchPath, name: str, nodetype: n.Node):
     item = workspace.resolve(name)
     assert item is not None
     assert item.name == name
-    assert isinstance(item, nodetype)
+    assert type(item) == nodetype
 
 
 

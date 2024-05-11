@@ -13,13 +13,11 @@ search_path.addpath(path, recursive=True)
 search_path.resolve_dependencies()
 #%%
 
-f0 = search_path.resolve('function0')
-f4 = search_path.resolve('function4')
-c0 = search_path.resolve('class0')
-c3 = search_path.resolve('class3')
-p2 = search_path.resolve('package2')
-p3 = search_path.resolve('package2.package3')
-lf = search_path.resolve('privatefunction', local_namespaces=[p2.path.parent])
+bf1 = search_path.resolve('basefunction1')
+bc1 = search_path.resolve('baseclass1')
+cc = search_path.resolve('classfoldercore')
+fc = search_path.resolve('functioncore')
+lf = search_path.resolve('baseprivatefunction', local_namespaces=[bc1.path.parent])
 # %%
 
 

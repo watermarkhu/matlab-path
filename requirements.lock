@@ -33,7 +33,7 @@ pyyaml==6.0.1
     # via textmate-grammar-python
 setuptools==69.5.1
     # via nodeenv
-textmate-grammar-python==0.4.0
+textmate-grammar-python==0.5.1
     # via matlab-search-path-resolver
 virtualenv==20.26.1
     # via pre-commit
