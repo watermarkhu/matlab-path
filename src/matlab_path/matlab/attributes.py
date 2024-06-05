@@ -11,7 +11,9 @@ class Attributes:
                 settings[key] = True
                 continue
             annotation = cls.__annotations__.get(key, bool)
-            if annotation == "bool":
+            if annotation == "str":
+                settings[key] = value
+            elif annotation == "bool":
                 if value in ["True", "true", "t", 1]:
                     settings[key] = True
                 else:

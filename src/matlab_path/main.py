@@ -3,8 +3,43 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from pathlib import Path
 
+from tqdm import tqdm
+
 from .matlab.nodes import Classdef, Package, Script
 from .matlab.parser import get_node
+
+
+class _PathGlobber:
+    def __init__(self, path: Path, recursive: bool = False):
+        self._idx = 0
+        self._paths: list[Path] = []
+        self._glob(path, recursive)
+
+    def _glob(self, path: Path, recursive: bool = False):
+        for member in path.iterdir():
+            if recursive and member.is_dir() and member.stem[0] not in ["+", "@"]:
+                self._glob(member, recursive=True)
+                continue
+
+            if member.is_file() and member.name == "Contents.m":
+                # ignore contents.m files except in package/class folders
+                continue
+
+            self._paths.append(member)
+
+    def __len__(self):
+        return len(self._paths)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            item = self._paths[self._idx]
+        except IndexError as err:
+            raise StopIteration from err
+        self._idx += 1
+        return item
 
 
 class SearchPath:
@@ -20,7 +55,12 @@ class SearchPath:
 
     """
 
-    def __init__(self, matlab_path: list[str | Path], dependency_analysis: bool = False) -> None:
+    def __init__(
+        self,
+        matlab_path: list[str | Path],
+        dependency_analysis: bool = False,
+        show_progressbar: bool = False,
+    ) -> None:
         """
         Initialize an instance of SearchPath.
 
@@ -41,6 +81,7 @@ class SearchPath:
         self._local_namespaces: dict[Path, dict[str, Path]] = defaultdict(dict)
         self._database: dict[Path, Script] = {}
         self._dependency_analysis = dependency_analysis
+        self._show_progressbar = show_progressbar
 
         for path in matlab_path:
             self.addpath(Path(path), to_end=True)
@@ -90,14 +131,11 @@ class SearchPath:
         else:
             self._search_path.appendleft(path)
 
-        for member in path.iterdir():
-            if recursive and member.is_dir() and member.stem[0] not in ["+", "@"]:
-                self.addpath(member, to_end=to_end, recursive=True)
-                continue
+        members = _PathGlobber(path, recursive=recursive)
 
-            if member.is_file() and member.name == "Contents.m":
-                # ignore contents.m files except in package/class folders
-                continue
+        for member in (pbar := tqdm(members)) if self._show_progressbar else members:
+            if self._show_progressbar:
+                pbar.set_postfix_str(member.stem)
 
             node = get_node(member, dependency_analysis=self._dependency_analysis)
             if node is None:
@@ -178,7 +216,9 @@ class SearchPath:
         Returns:
             None
         """
-        for node in self._database.values():
+        nodes = self._database.values()
+
+        for node in nodes:
             if not isinstance(node, Script):
                 continue
             self._resolve_node(node)

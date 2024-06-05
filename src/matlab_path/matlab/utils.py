@@ -155,9 +155,10 @@ def _analyze_dependency_function(element: ContentElement, node: Script) -> None:
     ):
         if item.token == "variable.parameter.input.matlab":
             local_variables.add(item.content)
-        elif item.token == "meta.assignment.variable.single.matlab":
-            local_variables.add(next(item.find("variable.other.readwrite.matlab"))[0].content)
-        elif item.token == "meta.assignment.variable.group.matlab":
+        elif item.token in [
+            "meta.assignment.variable.single.matlab",
+            "meta.assignment.variable.group.matlab",
+        ]:
             for variable, _ in item.find("variable.other.readwrite.matlab"):
                 local_variables.add(variable.content)
         elif item.token == "storage.type.matlab":
