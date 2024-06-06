@@ -28,6 +28,7 @@ from .utils import (
     fix_indentation,
 )
 
+_LEADING_TOKEN = "punctuation.whitespace.comment.leading.matlab"
 _COMMENT_TOKENS = [
     "comment.line.percentage.matlab",
     "comment.block.percentage.matlab",
@@ -414,12 +415,14 @@ def _parse_m_script(path: Path, element: ContentBlockElement, parent: Node | Non
 
     """
     docstring: dict[int, str] = {}
-    for function_item, _ in element.find(_COMMENT_TOKENS, stop_tokens="*", depth=1):
+    for function_item, _ in element.find(
+        _COMMENT_TOKENS + [_LEADING_TOKEN], stop_tokens="*", depth=1
+    ):
         if function_item.token == "comment.line.percentage.matlab":
             append_comment(function_item, docstring)
         elif function_item.token == "comment.line.double-percentage.matlab":
             append_section_comment(function_item, docstring)
-        else:
+        elif function_item.token == "comment.block.percentage.matlab":
             # Block comments will take precedence over single % comments
             append_block_comment(function_item, docstring)
             break

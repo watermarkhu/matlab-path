@@ -98,6 +98,7 @@ def analyze_dependency(element: ContentElement, node: Script) -> None:
     Returns:
         None
     """
+
     if isinstance(node, Classdef):
         builtins = _load_references()
 
@@ -126,12 +127,12 @@ def analyze_dependency(element: ContentElement, node: Script) -> None:
             elif class_elem.token == "meta.methods.matlab":
                 for method_elem, _ in class_elem.find("meta.function.matlab", depth=1):
                     fname = next(method_elem.find("entity.name.function.matlab"))[0].content
-                    _analyze_dependency_function(method_elem, node.methods[fname])
+                    _analyze_dependency_file(method_elem, node.methods[fname])
     else:
-        _analyze_dependency_function(element, node)
+        _analyze_dependency_file(element, node)
 
 
-def _analyze_dependency_function(element: ContentElement, node: Script) -> None:
+def _analyze_dependency_file(element: ContentElement, node: Script) -> None:
     builtins = _load_references()
 
     def add_dependency(name: str):
@@ -154,25 +155,31 @@ def _analyze_dependency_function(element: ContentElement, node: Script) -> None:
         ]
     ):
         if item.token == "variable.parameter.input.matlab":
+            # Function input variables
             local_variables.add(item.content)
+
         elif item.token in [
             "meta.assignment.variable.single.matlab",
             "meta.assignment.variable.group.matlab",
         ]:
+            # Assigned variables
             for variable, _ in item.find("variable.other.readwrite.matlab"):
                 local_variables.add(variable.content)
+
         elif item.token == "storage.type.matlab":
+            # Validator type
             add_dependency(item.content)
+
         elif item.token == "comment.line.percentage.matlab" and item.content.startswith(
             "%#function"
         ):
-            # https://mathworks.com/help/compiler/function.html
+            # Pragma types https://mathworks.com/help/compiler/function.html
             for pragma in [
                 pragma.strip() for pragma in item.content[10:].strip().split(" ") if pragma
             ]:
                 add_dependency(pragma)
         elif item.token == "entity.name.namespace.matlab":
-            # https://mathworks.com/help/matlab/ref/import.html
+            # Namespace imports https://mathworks.com/help/matlab/ref/import.html
             if item.children[-1].content == "*":
                 namespace = "".join([child.content for child in item.children[:-2]])
                 if namespace in builtins:
@@ -181,6 +188,7 @@ def _analyze_dependency_function(element: ContentElement, node: Script) -> None:
                     node._imports.add(namespace)
             else:
                 add_dependency("".join([child.content for child in item.children]))
+
         elif (
             item.token == "variable.other.readwrite.matlab"
             and item.content not in local_variables
@@ -193,6 +201,7 @@ def _analyze_dependency_function(element: ContentElement, node: Script) -> None:
                 ]
             )
         ):
+            # Function call without parentheses
             add_dependency(item.content)
 
     token_list = element.flatten()
@@ -201,8 +210,12 @@ def _analyze_dependency_function(element: ContentElement, node: Script) -> None:
             "meta.function-call.parens.matlab",
             "entity.name.function.matlab",
         ]:
+            # Add function call as dependency (does not add methods)
             if i > 1 and token_list[i - 1][2][-1] != "punctuation.accessor.dot.matlab":
-                add_dependency(content)
+                if content not in local_variables:
+                    add_dependency(content)
+
+            # Add full namespace of function call as dependency (does not add class objects)
             else:
                 name = content
                 while i > 1 and token_list[i - 1][2][-1] == "punctuation.accessor.dot.matlab":

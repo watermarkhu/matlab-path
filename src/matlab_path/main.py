@@ -27,6 +27,9 @@ class _PathGlobber:
 
             self._paths.append(member)
 
+    def max_stem_length(self) -> int:
+        return max(len(path.stem) for path in self._paths)
+
     def __len__(self):
         return len(self._paths)
 
@@ -132,10 +135,11 @@ class SearchPath:
             self._search_path.appendleft(path)
 
         members = _PathGlobber(path, recursive=recursive)
+        postfix_length = members.max_stem_length()
 
         for member in (pbar := tqdm(members)) if self._show_progressbar else members:
             if self._show_progressbar:
-                pbar.set_postfix_str(member.stem)
+                pbar.set_postfix_str("." * (postfix_length - len(member.stem)) + member.stem)
 
             node = get_node(member, dependency_analysis=self._dependency_analysis)
             if node is None:
